@@ -1,5 +1,4 @@
 import { useRouter } from "next/router";
-import { useState } from "react";
 
 const MASTER_TRACK_LIST = [
   "AS28", "AS29", "AS30", "AS31", "AS32", "AS33",
@@ -10,8 +9,6 @@ export default function ReorderTrackSelect() {
   const router = useRouter();
 
   const handleTrackSelect = (trackName: string) => {
-    // Find the track ID from the current tracks data
-    // For now, we'll use the track name as identifier and let Screen G handle it
     router.push(`/reorder/${trackName}`);
   };
 
