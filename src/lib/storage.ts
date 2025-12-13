@@ -37,6 +37,7 @@ function getInitialTracks(): Track[] {
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
+      lastChecked: undefined,
     },
     {
       id: "track-2",
@@ -44,6 +45,7 @@ function getInitialTracks(): Track[] {
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
+      lastChecked: undefined,
     },
     {
       id: "track-3",
@@ -51,6 +53,23 @@ function getInitialTracks(): Track[] {
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
+      lastChecked: undefined,
+    },
+    {
+      id: "track-4",
+      name: "Track 4",
+      cars: [],
+      totalCars: 0,
+      confirmedCars: 0,
+      lastChecked: undefined,
+    },
+    {
+      id: "track-5",
+      name: "Track 5",
+      cars: [],
+      totalCars: 0,
+      confirmedCars: 0,
+      lastChecked: undefined,
     },
   ];
 }

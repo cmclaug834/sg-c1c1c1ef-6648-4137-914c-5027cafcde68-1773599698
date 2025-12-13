@@ -9,6 +9,7 @@ interface AppContextType {
   confirmCar: (trackId: string, carId: string) => void;
   unconfirmCar: (trackId: string, carId: string) => void;
   setUser: (user: User) => void;
+  updateLastChecked: (trackId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -53,21 +54,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     setTracks(prev => prev.map(track => {
       if (track.id === trackId) {
+        const updatedCars = track.cars.map(car => 
+          car.id === carId 
+            ? { 
+                ...car, 
+                status: "confirmed" as const,
+                confirmedAt: new Date().toISOString(),
+                confirmedBy: currentUser.crewId,
+              }
+            : car
+        );
         return {
           ...track,
-          cars: track.cars.map(car => 
-            car.id === carId 
-              ? { 
-                  ...car, 
-                  status: "confirmed" as const,
-                  confirmedAt: new Date().toISOString(),
-                  confirmedBy: currentUser.crewId,
-                }
-              : car
-          ),
-          confirmedCars: track.cars.filter(c => 
-            c.id === carId || c.status === "confirmed"
-          ).length,
+          cars: updatedCars,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
       }
       return track;
@@ -77,23 +77,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const unconfirmCar = (trackId: string, carId: string) => {
     setTracks(prev => prev.map(track => {
       if (track.id === trackId) {
+        const updatedCars = track.cars.map(car => 
+          car.id === carId 
+            ? { 
+                ...car, 
+                status: "pending" as const,
+                confirmedAt: undefined,
+                confirmedBy: undefined,
+              }
+            : car
+        );
         return {
           ...track,
-          cars: track.cars.map(car => 
-            car.id === carId 
-              ? { 
-                  ...car, 
-                  status: "pending" as const,
-                  confirmedAt: undefined,
-                  confirmedBy: undefined,
-                }
-              : car
-          ),
-          confirmedCars: Math.max(0, track.confirmedCars - 1),
+          cars: updatedCars,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
       }
       return track;
     }));
+  };
+
+  const updateLastChecked = (trackId: string) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId 
+        ? { ...track, lastChecked: new Date().toISOString() }
+        : track
+    ));
   };
 
   const setUser = (user: User) => {
@@ -109,6 +118,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmCar,
       unconfirmCar,
       setUser,
+      updateLastChecked,
     }}>
       {children}
     </AppContext.Provider>

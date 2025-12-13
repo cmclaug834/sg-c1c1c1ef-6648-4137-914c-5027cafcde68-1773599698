@@ -13,6 +13,7 @@ export interface Track {
   cars: RailCar[];
   totalCars: number;
   confirmedCars: number;
+  lastChecked?: string;
 }
 
 export interface User {
