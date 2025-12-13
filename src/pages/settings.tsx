@@ -9,14 +9,21 @@ export default function Settings() {
   const [name, setName] = useState("");
   const [crewId, setCrewId] = useState("");
   const [requireDialog, setRequireDialog] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && currentUser) {
       setName(currentUser.name);
       setCrewId(currentUser.crewId);
     }
-    setRequireDialog(settings.requireUnconfirmDialog);
-  }, [currentUser, settings]);
+    if (mounted) {
+      setRequireDialog(settings.requireUnconfirmDialog);
+    }
+  }, [mounted, currentUser, settings]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

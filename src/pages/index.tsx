@@ -9,14 +9,19 @@ export default function TrackSelect() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCrewEdit, setShowCrewEdit] = useState(false);
   const [isOnline] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!currentUser) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !currentUser) {
       router.push("/settings");
     }
-  }, [currentUser, router]);
+  }, [mounted, currentUser, router]);
 
-  if (!currentUser) {
+  if (!mounted || !currentUser) {
     return null;
   }
 
