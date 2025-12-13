@@ -16,6 +16,7 @@ interface AppContextType {
   addTrack: (trackName: string) => void;
   toggleTrackEnabled: (trackId: string) => void;
   saveTracks: (tracks: Track[]) => void;
+  commitTrackOrder: (trackId: string, orderedCarList: RailCar[]) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -215,6 +216,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTracks(updatedTracks);
   };
 
+  const commitTrackOrder = (trackId: string, orderedCarList: RailCar[]) => {
+    if (!currentUser) return;
+
+    setTracks(prev => prev.map(track => {
+      if (track.id !== trackId) return track;
+
+      // Safety net: find any cars not in the ordered list
+      const orderedIds = new Set(orderedCarList.map(c => c.id));
+      const missingCars = track.cars.filter(c => !orderedIds.has(c.id));
+
+      // New order = ordered list + missing cars appended
+      const finalOrder = [...orderedCarList, ...missingCars];
+
+      // Log the order update event
+      const orderLog = {
+        id: `order-${Date.now()}`,
+        trackId: track.id,
+        trackName: track.name,
+        timestamp: new Date().toISOString(),
+        crewId: currentUser.crewId,
+        reason: "ORDER_UPDATED",
+        carCount: finalOrder.length,
+      };
+
+      const existingLogs = JSON.parse(localStorage.getItem("rail_yard_order_logs") || "[]");
+      localStorage.setItem("rail_yard_order_logs", JSON.stringify([...existingLogs, orderLog]));
+
+      return {
+        ...track,
+        cars: finalOrder,
+      };
+    }));
+  };
+
   return (
     <AppContext.Provider value={{
       tracks,
@@ -230,6 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addTrack,
       toggleTrackEnabled,
       saveTracks,
+      commitTrackOrder,
     }}>
       {children}
     </AppContext.Provider>
