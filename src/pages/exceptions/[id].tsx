@@ -5,12 +5,12 @@ import { useState } from "react";
 import { normalizeCarId } from "@/lib/carIdFormatter";
 
 export default function ExceptionsReview() {
-  const { tracks } = useApp();
+  const { tracks, moveCar } = useApp();
   const router = useRouter();
   const { id } = router.query;
   
   const [selectedCars, setSelectedCars] = useState<Set<string>>(new Set());
-  const [resolutions, setResolutions] = useState<Record<string, { type: "missing" | "move"; targetTrack?: string }>>({});
+  const [resolutions, setResolutions] = useState<Record<string, { type: "missing" | "move"; targetTrackId?: string; targetTrackName?: string }>>({});
 
   const track = tracks.find(t => t.id === id);
   const unconfirmedCars = track?.cars.filter(car => car.status === "pending") || [];
@@ -49,7 +49,11 @@ export default function ExceptionsReview() {
 
     const newResolutions = { ...resolutions };
     selectedCars.forEach(carId => {
-      newResolutions[carId] = { type: "move", targetTrack: targetTrack.name };
+      newResolutions[carId] = { 
+        type: "move", 
+        targetTrackId: targetTrackId,
+        targetTrackName: targetTrack.name 
+      };
     });
     setResolutions(newResolutions);
     setSelectedCars(new Set());
@@ -64,7 +68,18 @@ export default function ExceptionsReview() {
   const allResolved = unconfirmedCars.length > 0 && unconfirmedCars.every(car => resolutions[car.id]);
 
   const handleFinish = () => {
-    // TODO: Apply resolutions to cars (mark as missing, move to other tracks)
+    // Execute all move resolutions
+    unconfirmedCars.forEach(car => {
+      const resolution = resolutions[car.id];
+      if (resolution?.type === "move" && resolution.targetTrackId) {
+        // Execute the move using the moveCar method
+        moveCar(car.id, track.id, resolution.targetTrackId, "MORNING_RECONCILE");
+      }
+      // Items marked "missing" remain on the track with status "pending"
+      // They will show up as unconfirmed in the track's active list
+    });
+
+    // Return to Screen A (Track Select)
     router.push("/");
   };
 
@@ -187,7 +202,7 @@ export default function ExceptionsReview() {
                               </div>
                             ) : (
                               <div className="E.resolutionTag inline-flex items-center gap-2 bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-lg text-sm font-medium">
-                                Move → {resolution.targetTrack}
+                                Move → {resolution.targetTrackName}
                               </div>
                             )}
                             <button
