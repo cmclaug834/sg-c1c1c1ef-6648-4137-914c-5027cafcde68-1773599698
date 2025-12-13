@@ -1,6 +1,6 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown } from "lucide-react";
 import { useState } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -167,7 +167,14 @@ export default function TrackDetail() {
               {track.name}
             </h1>
             
-            <div className="w-14 md:w-16" />
+            <button
+              id="B.reorderBtn"
+              onClick={() => router.push(`/reorder/${track.id}`)}
+              className="p-3 hover:bg-zinc-800 rounded-lg transition-colors"
+              aria-label="Reorder cars"
+            >
+              <ArrowUpDown className="w-7 h-7 md:w-8 md:h-8" />
+            </button>
           </div>
 
           <div id="B.progressText" className="bg-zinc-800 p-4 rounded-xl mb-4">
