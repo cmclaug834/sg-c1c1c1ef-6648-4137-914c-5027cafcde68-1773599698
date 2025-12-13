@@ -56,9 +56,7 @@ export default function TrackDetail() {
 
     // If resolveOnDone is ON, open Exceptions Review (Screen E)
     if (settings.resolveOnDone) {
-      // TODO: Navigate to Screen E (Exceptions Review)
-      // For now, just return to track list
-      router.push("/");
+      router.push(`/exceptions/${track.id}`);
       return;
     }
 
