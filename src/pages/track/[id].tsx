@@ -1,6 +1,6 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Plus, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -30,6 +30,9 @@ export default function TrackDetail() {
       } else {
         unconfirmCar(track.id, carId);
       }
+    } else if (currentStatus === "missing") {
+      // Missing cars cannot be toggled directly
+      return;
     } else {
       confirmCar(track.id, carId);
     }
@@ -135,13 +138,16 @@ export default function TrackDetail() {
                 <button
                   key={car.id}
                   onClick={() => handleToggleConfirm(car.id, car.status, car.carNumber)}
-                  className="B.carRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors"
+                  disabled={car.status === "missing"}
+                  className="B.carRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-4">
                     {/* B.confirmStateIcon */}
                     <div className="B.confirmStateIcon flex-shrink-0">
                       {car.status === "confirmed" ? (
                         <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
+                      ) : car.status === "missing" ? (
+                        <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
                       ) : (
                         <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
                       )}
@@ -162,6 +168,13 @@ export default function TrackDetail() {
                         <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
                           Confirmed {formatConfirmedTime(car.confirmedAt)}
                           {car.confirmedBy && ` by ${car.confirmedBy}`}
+                        </div>
+                      )}
+
+                      {/* B.missingSubtext */}
+                      {car.status === "missing" && (
+                        <div className="B.missingSubtext text-yellow-500 text-sm md:text-base">
+                          Marked missing in morning check
                         </div>
                       )}
                     </div>

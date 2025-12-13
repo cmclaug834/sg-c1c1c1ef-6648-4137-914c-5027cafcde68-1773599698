@@ -4,7 +4,7 @@ export interface RailCar {
   carType: string;
   confirmedAt?: string;
   confirmedBy?: string;
-  status: "pending" | "confirmed";
+  status: "pending" | "confirmed" | "missing";
 }
 
 export interface Track {
