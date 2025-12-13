@@ -24,4 +24,7 @@ export interface User {
 
 export interface AppSettings {
   requireUnconfirmDialog: boolean;
+  resolveOnDone?: boolean;
+  showMissingInList?: boolean;
+  movePlacement?: "append" | "prepend";
 }

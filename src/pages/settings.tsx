@@ -9,6 +9,9 @@ export default function Settings() {
   const [name, setName] = useState("");
   const [crewId, setCrewId] = useState("");
   const [requireDialog, setRequireDialog] = useState(false);
+  const [resolveOnDone, setResolveOnDone] = useState(true);
+  const [showMissingInList, setShowMissingInList] = useState(false);
+  const [movePlacement, setMovePlacement] = useState<"append" | "prepend">("append");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -22,6 +25,9 @@ export default function Settings() {
     }
     if (mounted) {
       setRequireDialog(settings.requireUnconfirmDialog);
+      setResolveOnDone(settings.resolveOnDone ?? true);
+      setShowMissingInList(settings.showMissingInList ?? false);
+      setMovePlacement(settings.movePlacement ?? "append");
     }
   }, [mounted, currentUser, settings]);
 
@@ -40,7 +46,36 @@ export default function Settings() {
   const handleToggleDialog = () => {
     const newValue = !requireDialog;
     setRequireDialog(newValue);
-    updateSettings({ requireUnconfirmDialog: newValue });
+    updateSettings({ 
+      ...settings,
+      requireUnconfirmDialog: newValue 
+    });
+  };
+
+  const handleToggleResolveOnDone = () => {
+    const newValue = !resolveOnDone;
+    setResolveOnDone(newValue);
+    updateSettings({
+      ...settings,
+      resolveOnDone: newValue
+    });
+  };
+
+  const handleToggleShowMissing = () => {
+    const newValue = !showMissingInList;
+    setShowMissingInList(newValue);
+    updateSettings({
+      ...settings,
+      showMissingInList: newValue
+    });
+  };
+
+  const handleMovePlacementChange = (value: "append" | "prepend") => {
+    setMovePlacement(value);
+    updateSettings({
+      ...settings,
+      movePlacement: value
+    });
   };
 
   return (
@@ -124,6 +159,96 @@ export default function Settings() {
               When enabled, you'll be asked to confirm before unmarking a car as unconfirmed
             </p>
           </button>
+        </div>
+
+        {/* D.sectionReconciliation */}
+        <div id="D.sectionReconciliation" className="mt-12 pt-8 border-t border-zinc-800">
+          <h2 className="text-2xl font-bold mb-6">Reconciliation</h2>
+
+          <div className="space-y-4">
+            {/* D.resolveOnDoneToggle */}
+            <button
+              id="D.resolveOnDoneToggle"
+              onClick={handleToggleResolveOnDone}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-lg font-medium">Resolve unconfirmed cars when Done is tapped</span>
+                <div className={`w-12 h-7 rounded-full transition-colors relative ${
+                  resolveOnDone ? "bg-green-600" : "bg-zinc-700"
+                }`}>
+                  <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                    resolveOnDone ? "translate-x-5" : ""
+                  }`} />
+                </div>
+              </div>
+              
+              {/* D.resolveHelpText */}
+              <p id="D.resolveHelpText" className="text-sm text-zinc-500">
+                Automatically marks remaining unconfirmed cars as resolved when you finish checking a track
+              </p>
+            </button>
+
+            {/* D.showMissingInListToggle */}
+            <button
+              id="D.showMissingInListToggle"
+              onClick={handleToggleShowMissing}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-lg font-medium">Show missing cars in the track list after completing a check</span>
+                <div className={`w-12 h-7 rounded-full transition-colors relative ${
+                  showMissingInList ? "bg-green-600" : "bg-zinc-700"
+                }`}>
+                  <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                    showMissingInList ? "translate-x-5" : ""
+                  }`} />
+                </div>
+              </div>
+              
+              {/* D.missingHelpText */}
+              <p id="D.missingHelpText" className="text-sm text-zinc-500">
+                Display cars that weren't confirmed during the check in the track overview
+              </p>
+            </button>
+
+            {/* D.movePlacementOption */}
+            <div id="D.movePlacementOption" className="bg-zinc-800 p-5 rounded-xl">
+              <div className="mb-4">
+                <span className="text-lg font-medium block mb-2">When moving cars to another track:</span>
+                
+                {/* D.movePlacementHelpText */}
+                <p id="D.movePlacementHelpText" className="text-sm text-zinc-500">
+                  Choose where moved cars appear in the destination track's list
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleMovePlacementChange("append")}
+                  className={`flex-1 py-4 rounded-lg text-base font-medium transition-colors ${
+                    movePlacement === "append"
+                      ? "bg-green-600 text-white"
+                      : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
+                  }`}
+                >
+                  Append to bottom
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMovePlacementChange("prepend")}
+                  className={`flex-1 py-4 rounded-lg text-base font-medium transition-colors ${
+                    movePlacement === "prepend"
+                      ? "bg-green-600 text-white"
+                      : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600"
+                  }`}
+                >
+                  Insert at top
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -30,9 +30,19 @@ export const storage = {
   },
 
   getSettings: (): AppSettings => {
-    if (typeof window === "undefined") return { requireUnconfirmDialog: false };
+    if (typeof window === "undefined") return { 
+      requireUnconfirmDialog: false,
+      resolveOnDone: true,
+      showMissingInList: false,
+      movePlacement: "append"
+    };
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? JSON.parse(data) : { requireUnconfirmDialog: false };
+    return data ? JSON.parse(data) : { 
+      requireUnconfirmDialog: false,
+      resolveOnDone: true,
+      showMissingInList: false,
+      movePlacement: "append"
+    };
   },
 
   saveSettings: (settings: AppSettings) => {
