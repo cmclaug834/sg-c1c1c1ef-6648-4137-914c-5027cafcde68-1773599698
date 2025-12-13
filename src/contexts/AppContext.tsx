@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Track, User, RailCar, AppSettings } from "@/types";
+import { Track, User, RailCar, AppSettings, MoveLog } from "@/types";
 import { storage } from "@/lib/storage";
 
 interface AppContextType {
@@ -9,6 +9,7 @@ interface AppContextType {
   addCar: (trackId: string, car: Omit<RailCar, "id" | "status">) => void;
   confirmCar: (trackId: string, carId: string) => void;
   unconfirmCar: (trackId: string, carId: string) => void;
+  moveCar: (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE") => boolean;
   setUser: (user: User) => void;
   updateSettings: (settings: AppSettings) => void;
   updateLastChecked: (trackId: string) => void;
@@ -104,6 +105,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const moveCar = (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE"): boolean => {
+    if (!currentUser) return false;
+
+    // Find source track and car
+    const fromTrack = tracks.find(t => t.id === fromTrackId);
+    const car = fromTrack?.cars.find(c => c.id === carId);
+    
+    if (!fromTrack || !car) return false;
+
+    // Validate destination track exists
+    const toTrack = tracks.find(t => t.id === toTrackId);
+    if (!toTrack) return false;
+
+    // Check for duplicates in destination track
+    const duplicateExists = toTrack.cars.some(c => c.carNumber === car.carNumber);
+    if (duplicateExists) return false;
+
+    // Create move log entry
+    const moveLog: MoveLog = {
+      id: `move-${Date.now()}`,
+      carId: car.id,
+      carNumber: car.carNumber,
+      fromTrack: fromTrack.name,
+      toTrack: toTrack.name,
+      timestamp: new Date().toISOString(),
+      crewId: currentUser.crewId,
+      reason,
+    };
+
+    // Store move log (localStorage for now)
+    const existingLogs = JSON.parse(localStorage.getItem("rail_yard_move_logs") || "[]");
+    localStorage.setItem("rail_yard_move_logs", JSON.stringify([...existingLogs, moveLog]));
+
+    // Perform the move
+    setTracks(prev => prev.map(track => {
+      // Remove from source track
+      if (track.id === fromTrackId) {
+        const updatedCars = track.cars.filter(c => c.id !== carId);
+        return {
+          ...track,
+          cars: updatedCars,
+          totalCars: updatedCars.length,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+      }
+      
+      // Add to destination track
+      if (track.id === toTrackId) {
+        const placement = settings.movePlacement || "append";
+        const movedCar = { ...car, status: "pending" as const, confirmedAt: undefined, confirmedBy: undefined };
+        const updatedCars = placement === "prepend" 
+          ? [movedCar, ...track.cars]
+          : [...track.cars, movedCar];
+        
+        return {
+          ...track,
+          cars: updatedCars,
+          totalCars: updatedCars.length,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+      }
+      
+      return track;
+    }));
+
+    return true;
+  };
+
   const updateLastChecked = (trackId: string) => {
     setTracks(prev => prev.map(track => 
       track.id === trackId 
@@ -154,6 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCar,
       confirmCar,
       unconfirmCar,
+      moveCar,
       setUser,
       updateSettings,
       updateLastChecked,

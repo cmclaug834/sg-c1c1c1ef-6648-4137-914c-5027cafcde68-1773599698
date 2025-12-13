@@ -7,6 +7,17 @@ export interface RailCar {
   status: "pending" | "confirmed" | "missing";
 }
 
+export interface MoveLog {
+  id: string;
+  carId: string;
+  carNumber: string;
+  fromTrack: string;
+  toTrack: string;
+  timestamp: string;
+  crewId: string;
+  reason: "MORNING_RECONCILE" | "DAY_MOVE";
+}
+
 export interface Track {
   id: string;
   name: string;
