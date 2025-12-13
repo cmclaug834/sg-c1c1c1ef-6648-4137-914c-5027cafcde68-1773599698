@@ -4,6 +4,8 @@ import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Tra
 import { useState } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
+import { TrackPickerModal } from "@/components/TrackPickerModal";
+import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
 
 export default function TrackDetail() {
   const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser } = useApp();
@@ -443,102 +445,185 @@ export default function TrackDetail() {
 }
 
 function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => void }) {
-  const { addCar } = useApp();
+  const { addCar, tracks, saveTracks } = useApp();
   const [carNumber, setCarNumber] = useState("");
   const [carType, setCarType] = useState("BOX");
+  const [duplicateInfo, setDuplicateInfo] = useState<{ trackId: string; trackName: string } | null>(null);
 
   const carTypes = ["BOX", "TANK", "FLAT", "HOPPER", "GONDOLA", "AUTO"];
 
   const normalizedPreview = normalizeCarId(carNumber);
   const isValid = carNumber.trim() && /[a-zA-Z]/.test(carNumber) && /[0-9]/.test(carNumber);
 
+  const findDuplicate = (normalizedCarId: string): { trackId: string; trackName: string } | null => {
+    for (const track of tracks) {
+      const existingCar = track.cars.find(car => 
+        normalizeCarId(car.carNumber) === normalizedCarId
+      );
+      if (existingCar) {
+        return { trackId: track.id, trackName: track.name };
+      }
+    }
+    return null;
+  };
+
+  const handleAddCar = () => {
+    if (!isValid) return;
+    
+    const duplicate = findDuplicate(normalizedPreview);
+    if (duplicate) {
+      setDuplicateInfo(duplicate);
+      return;
+    }
+
+    // No duplicate - add normally
+    addCar(trackId, {
+      carNumber: normalizedPreview,
+      carType,
+    });
+    onClose();
+  };
+
+  const handleContinueWithDuplicate = () => {
+    // Add duplicate anyway
+    addCar(trackId, {
+      carNumber: normalizedPreview,
+      carType,
+    });
+    setDuplicateInfo(null);
+    onClose();
+  };
+
+  const handleReenter = () => {
+    // Close dialog and return focus to input
+    setDuplicateInfo(null);
+  };
+
+  const handleRemoveExisting = () => {
+    if (!duplicateInfo) return;
+
+    // Remove existing car from its track
+    const updatedTracks = tracks.map(track => {
+      if (track.id === duplicateInfo.trackId) {
+        const updatedCars = track.cars.filter(car => 
+          normalizeCarId(car.carNumber) !== normalizedPreview
+        );
+        return {
+          ...track,
+          cars: updatedCars,
+          totalCars: updatedCars.length,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+      }
+      return track;
+    });
+
+    saveTracks(updatedTracks);
+
+    // Now add to current track
+    addCar(trackId, {
+      carNumber: normalizedPreview,
+      carType,
+    });
+    
+    setDuplicateInfo(null);
+    onClose();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isValid) {
-      addCar(trackId, {
-        carNumber: normalizedPreview,
-        carType,
-      });
-      onClose();
-    }
+    handleAddCar();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center p-4 z-50">
-      <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold mb-6">Add Car</h2>
+    <>
+      <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center p-4 z-50">
+        <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800">
+          <div className="p-6">
+            <h2 className="text-2xl font-bold mb-6">Add Car</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-zinc-400 mb-2 text-lg">Car Number</label>
-              <input
-                id="C.carNumberInput"
-                type="text"
-                value={carNumber}
-                onChange={(e) => setCarNumber(e.target.value)}
-                className="w-full bg-zinc-800 text-white text-2xl font-mono px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                placeholder="tbox663566"
-                autoFocus
-              />
-              
-              {carNumber.trim() && normalizedPreview && (
-                <div id="C.normalizedPreview" className="mt-2 text-zinc-400 text-base">
-                  Will save as: <span className="font-mono font-semibold text-white">{normalizedPreview}</span>
-                </div>
-              )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-zinc-400 mb-2 text-lg">Car Number</label>
+                <input
+                  id="C.carNumberInput"
+                  type="text"
+                  value={carNumber}
+                  onChange={(e) => setCarNumber(e.target.value)}
+                  className="w-full bg-zinc-800 text-white text-2xl font-mono px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                  placeholder="tbox663566"
+                  autoFocus
+                />
+                
+                {carNumber.trim() && normalizedPreview && (
+                  <div id="C.normalizedPreview" className="mt-2 text-zinc-400 text-base">
+                    Will save as: <span className="font-mono font-semibold text-white">{normalizedPreview}</span>
+                  </div>
+                )}
 
-              {carNumber.trim() && !isValid && (
-                <div id="C.duplicateWarn" className="mt-2 text-yellow-500 text-sm">
-                  Enter letters + numbers (example: TBOX 663566)
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-zinc-400 mb-2 text-lg">Car Type</label>
-              <div className="grid grid-cols-3 gap-3">
-                {carTypes.map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setCarType(type)}
-                    className={`py-4 rounded-lg text-lg font-medium transition-colors ${
-                      carType === type
-                        ? "bg-green-600 text-white"
-                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
+                {carNumber.trim() && !isValid && (
+                  <div id="C.duplicateWarn" className="mt-2 text-yellow-500 text-sm">
+                    Enter letters + numbers (example: TBOX 663566)
+                  </div>
+                )}
               </div>
-            </div>
 
-            <div className="flex gap-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                id="C.addBtn"
-                type="submit"
-                disabled={!isValid}
-                className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
-                  isValid
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                }`}
-              >
-                Add Car
-              </button>
-            </div>
-          </form>
+              <div>
+                <label className="block text-zinc-400 mb-2 text-lg">Car Type</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {carTypes.map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setCarType(type)}
+                      className={`py-4 rounded-lg text-lg font-medium transition-colors ${
+                        carType === type
+                          ? "bg-green-600 text-white"
+                          : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  id="C.addBtn"
+                  type="submit"
+                  disabled={!isValid}
+                  className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
+                    isValid
+                      ? "bg-green-600 hover:bg-green-700"
+                      : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                  }`}
+                >
+                  Add Car
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Dialog Y: Duplicate Car Warning */}
+      {duplicateInfo && (
+        <DuplicateCarDialog
+          carNumber={normalizedPreview}
+          existingTrackName={duplicateInfo.trackName}
+          onContinue={handleContinueWithDuplicate}
+          onReenter={handleReenter}
+          onRemoveExisting={handleRemoveExisting}
+        />
+      )}
+    </>
   );
 }
