@@ -223,11 +223,14 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
 
   const carTypes = ["BOX", "TANK", "FLAT", "HOPPER", "GONDOLA", "AUTO"];
 
+  const normalizedPreview = normalizeCarId(carNumber);
+  const isValid = carNumber.trim() && /[a-zA-Z]/.test(carNumber) && /[0-9]/.test(carNumber);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (carNumber.trim()) {
+    if (isValid) {
       addCar(trackId, {
-        carNumber: normalizeCarId(carNumber.trim()),
+        carNumber: normalizedPreview,
         carType,
       });
       onClose();
@@ -244,13 +247,28 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
             <div>
               <label className="block text-zinc-400 mb-2 text-lg">Car Number</label>
               <input
+                id="C.carNumberInput"
                 type="text"
                 value={carNumber}
                 onChange={(e) => setCarNumber(e.target.value)}
                 className="w-full bg-zinc-800 text-white text-2xl font-mono px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                placeholder="123456"
+                placeholder="tbox663566"
                 autoFocus
               />
+              
+              {/* C.normalizedPreview - Live preview of normalized format */}
+              {carNumber.trim() && normalizedPreview && (
+                <div id="C.normalizedPreview" className="mt-2 text-zinc-400 text-base">
+                  Will save as: <span className="font-mono font-semibold text-white">{normalizedPreview}</span>
+                </div>
+              )}
+
+              {/* C.duplicateWarn - Validation message */}
+              {carNumber.trim() && !isValid && (
+                <div id="C.duplicateWarn" className="mt-2 text-yellow-500 text-sm">
+                  Enter letters + numbers (example: TBOX 663566)
+                </div>
+              )}
             </div>
 
             <div>
@@ -282,8 +300,14 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
                 Cancel
               </button>
               <button
+                id="C.addBtn"
                 type="submit"
-                className="flex-1 py-4 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-medium"
+                disabled={!isValid}
+                className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
+                  isValid
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                }`}
               >
                 Add Car
               </button>
