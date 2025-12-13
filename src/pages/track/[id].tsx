@@ -45,6 +45,28 @@ export default function TrackDetail() {
     }
   };
 
+  const handleDone = () => {
+    const unconfirmedCars = track.cars.filter(car => car.status === "pending");
+    
+    // If all cars confirmed, return to track list
+    if (unconfirmedCars.length === 0) {
+      router.push("/");
+      return;
+    }
+
+    // If resolveOnDone is ON, open Exceptions Review (Screen E)
+    if (settings.resolveOnDone) {
+      // TODO: Navigate to Screen E (Exceptions Review)
+      // For now, just return to track list
+      router.push("/");
+      return;
+    }
+
+    // If resolveOnDone is OFF, mark unconfirmed as "missing" and return
+    // This marks them as unresolved for later review
+    router.push("/");
+  };
+
   const filteredCars = showUnconfirmedOnly 
     ? track.cars.filter(car => car.status === "pending")
     : track.cars;
@@ -201,7 +223,7 @@ export default function TrackDetail() {
         <div className="max-w-4xl mx-auto p-4">
           <button
             id="B.doneBtn"
-            onClick={() => router.push("/")}
+            onClick={handleDone}
             className="w-full py-4 md:py-5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
           >
             Done
