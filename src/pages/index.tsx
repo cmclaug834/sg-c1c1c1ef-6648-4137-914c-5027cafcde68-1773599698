@@ -33,7 +33,7 @@ export default function TrackSelect() {
   });
 
   const filteredTracks = tracks.filter(track =>
-    track.name.toLowerCase().includes(searchQuery.toLowerCase())
+    track.enabled !== false && track.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleTrackClick = (trackId: string) => {

@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function Settings() {
-  const { currentUser, setUser, settings, updateSettings } = useApp();
+  const { currentUser, setUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks } = useApp();
   const router = useRouter();
   const [name, setName] = useState("");
   const [crewId, setCrewId] = useState("");
@@ -12,7 +12,11 @@ export default function Settings() {
   const [resolveOnDone, setResolveOnDone] = useState(true);
   const [showMissingInList, setShowMissingInList] = useState(false);
   const [movePlacement, setMovePlacement] = useState<"append" | "prepend">("append");
+  const [adminManageTracks, setAdminManageTracks] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [newTrackInput, setNewTrackInput] = useState("");
+  const [trackValidation, setTrackValidation] = useState("");
+  const [localTracks, setLocalTracks] = useState<typeof tracks>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -28,8 +32,10 @@ export default function Settings() {
       setResolveOnDone(settings.resolveOnDone ?? true);
       setShowMissingInList(settings.showMissingInList ?? false);
       setMovePlacement(settings.movePlacement ?? "append");
+      setAdminManageTracks(settings.adminManageTracks ?? false);
+      setLocalTracks(tracks);
     }
-  }, [mounted, currentUser, settings]);
+  }, [mounted, currentUser, settings, tracks]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +82,52 @@ export default function Settings() {
       ...settings,
       movePlacement: value
     });
+  };
+
+  const handleToggleAdminManageTracks = () => {
+    const newValue = !adminManageTracks;
+    setAdminManageTracks(newValue);
+    updateSettings({
+      ...settings,
+      adminManageTracks: newValue
+    });
+  };
+
+  const validateTrackName = (input: string): boolean => {
+    const pattern = /^AS\d+$/;
+    return pattern.test(input.toUpperCase());
+  };
+
+  const handleAddTrack = () => {
+    const normalized = newTrackInput.toUpperCase();
+    
+    if (!validateTrackName(normalized)) {
+      setTrackValidation("Format must be AS## (example: AS50)");
+      return;
+    }
+
+    if (localTracks.some(t => t.name === normalized)) {
+      setTrackValidation("Track already exists");
+      return;
+    }
+
+    addTrack(normalized);
+    setNewTrackInput("");
+    setTrackValidation("");
+  };
+
+  const handleToggleTrack = (trackId: string) => {
+    setLocalTracks(prev => prev.map(track =>
+      track.id === trackId
+        ? { ...track, enabled: !track.enabled }
+        : track
+    ));
+  };
+
+  const handleSaveTrackChanges = () => {
+    saveTracks(localTracks);
+    setTrackValidation("Changes saved successfully");
+    setTimeout(() => setTrackValidation(""), 2000);
   };
 
   return (
@@ -249,6 +301,108 @@ export default function Settings() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* D.sectionTracks */}
+        <div id="D.sectionTracks" className="mt-12 pt-8 border-t border-zinc-800">
+          <h2 className="text-2xl font-bold mb-6">Tracks</h2>
+
+          {/* D.adminManageTracksToggle */}
+          <button
+            id="D.adminManageTracksToggle"
+            onClick={handleToggleAdminManageTracks}
+            className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors mb-4"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-lg font-medium">Admin: Manage Tracks</span>
+              <div className={`w-12 h-7 rounded-full transition-colors relative ${
+                adminManageTracks ? "bg-green-600" : "bg-zinc-700"
+              }`}>
+                <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                  adminManageTracks ? "translate-x-5" : ""
+                }`} />
+              </div>
+            </div>
+            
+            <p className="text-sm text-zinc-500">
+              Enable to add new tracks or disable existing ones
+            </p>
+          </button>
+
+          {/* D.manageTracksPanel */}
+          {adminManageTracks && (
+            <div id="D.manageTracksPanel" className="bg-zinc-800 p-5 rounded-xl space-y-4">
+              {/* D.trackManageList */}
+              <div id="D.trackManageList" className="space-y-3">
+                {localTracks.map(track => (
+                  <div key={track.id} className="D.trackManageRow flex items-center justify-between bg-zinc-900 p-4 rounded-lg">
+                    {/* D.trackIdText */}
+                    <span id="D.trackIdText" className="text-lg font-mono font-medium">
+                      {track.name}
+                    </span>
+
+                    {/* D.trackEnabledToggle */}
+                    <button
+                      id="D.trackEnabledToggle"
+                      onClick={() => handleToggleTrack(track.id)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        track.enabled
+                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          : "bg-zinc-700 hover:bg-zinc-600 text-zinc-400"
+                      }`}
+                    >
+                      {track.enabled ? "Enabled" : "Disabled"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-zinc-700 space-y-3">
+                <div>
+                  <label className="block text-zinc-400 mb-2 text-sm">Add New Track</label>
+                  {/* D.addTrackInput */}
+                  <input
+                    id="D.addTrackInput"
+                    type="text"
+                    value={newTrackInput}
+                    onChange={(e) => {
+                      setNewTrackInput(e.target.value);
+                      setTrackValidation("");
+                    }}
+                    className="w-full bg-zinc-900 text-white text-lg font-mono px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                    placeholder="AS## (example: AS50)"
+                  />
+                  
+                  {/* D.trackValidationText */}
+                  {trackValidation && (
+                    <p id="D.trackValidationText" className={`mt-2 text-sm ${
+                      trackValidation.includes("successfully") ? "text-green-500" : "text-yellow-500"
+                    }`}>
+                      {trackValidation}
+                    </p>
+                  )}
+                </div>
+
+                {/* D.addTrackBtn */}
+                <button
+                  id="D.addTrackBtn"
+                  onClick={handleAddTrack}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
+                >
+                  Add Track
+                </button>
+
+                {/* D.saveTrackChangesBtn */}
+                <button
+                  id="D.saveTrackChangesBtn"
+                  onClick={handleSaveTrackChanges}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-base font-medium transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

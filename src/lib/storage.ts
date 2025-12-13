@@ -34,14 +34,16 @@ export const storage = {
       requireUnconfirmDialog: false,
       resolveOnDone: true,
       showMissingInList: false,
-      movePlacement: "append"
+      movePlacement: "append",
+      adminManageTracks: false
     };
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     return data ? JSON.parse(data) : { 
       requireUnconfirmDialog: false,
       resolveOnDone: true,
       showMissingInList: false,
-      movePlacement: "append"
+      movePlacement: "append",
+      adminManageTracks: false
     };
   },
 
@@ -55,43 +57,48 @@ function getInitialTracks(): Track[] {
   return [
     {
       id: "track-1",
-      name: "Track 1",
+      name: "AS01",
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
       lastChecked: undefined,
+      enabled: true,
     },
     {
       id: "track-2",
-      name: "Track 2",
+      name: "AS02",
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
       lastChecked: undefined,
+      enabled: true,
     },
     {
       id: "track-3",
-      name: "Track 3",
+      name: "AS03",
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
       lastChecked: undefined,
+      enabled: true,
     },
     {
       id: "track-4",
-      name: "Track 4",
+      name: "AS04",
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
       lastChecked: undefined,
+      enabled: true,
     },
     {
       id: "track-5",
-      name: "Track 5",
+      name: "AS05",
       cars: [],
       totalCars: 0,
       confirmedCars: 0,
       lastChecked: undefined,
+      enabled: true,
     },
   ];
 }

@@ -14,6 +14,7 @@ export interface Track {
   totalCars: number;
   confirmedCars: number;
   lastChecked?: string;
+  enabled?: boolean;
 }
 
 export interface User {
@@ -27,4 +28,5 @@ export interface AppSettings {
   resolveOnDone?: boolean;
   showMissingInList?: boolean;
   movePlacement?: "append" | "prepend";
+  adminManageTracks?: boolean;
 }

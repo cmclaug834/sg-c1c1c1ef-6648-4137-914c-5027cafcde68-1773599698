@@ -12,6 +12,9 @@ interface AppContextType {
   setUser: (user: User) => void;
   updateSettings: (settings: AppSettings) => void;
   updateLastChecked: (trackId: string) => void;
+  addTrack: (trackName: string) => void;
+  toggleTrackEnabled: (trackId: string) => void;
+  saveTracks: (tracks: Track[]) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -119,6 +122,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storage.saveUser(user);
   };
 
+  const addTrack = (trackName: string) => {
+    const newTrack: Track = {
+      id: `track-${Date.now()}`,
+      name: trackName,
+      cars: [],
+      totalCars: 0,
+      confirmedCars: 0,
+      enabled: true,
+    };
+    setTracks(prev => [...prev, newTrack]);
+  };
+
+  const toggleTrackEnabled = (trackId: string) => {
+    setTracks(prev => prev.map(track =>
+      track.id === trackId
+        ? { ...track, enabled: !track.enabled }
+        : track
+    ));
+  };
+
+  const saveTracks = (updatedTracks: Track[]) => {
+    setTracks(updatedTracks);
+  };
+
   return (
     <AppContext.Provider value={{
       tracks,
@@ -130,6 +157,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser,
       updateSettings,
       updateLastChecked,
+      addTrack,
+      toggleTrackEnabled,
+      saveTracks,
     }}>
       {children}
     </AppContext.Provider>
