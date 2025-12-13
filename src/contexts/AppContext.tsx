@@ -1,14 +1,16 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Track, User, RailCar } from "@/types";
+import { Track, User, RailCar, AppSettings } from "@/types";
 import { storage } from "@/lib/storage";
 
 interface AppContextType {
   tracks: Track[];
   currentUser: User | null;
+  settings: AppSettings;
   addCar: (trackId: string, car: Omit<RailCar, "id" | "status">) => void;
   confirmCar: (trackId: string, carId: string) => void;
   unconfirmCar: (trackId: string, carId: string) => void;
   setUser: (user: User) => void;
+  updateSettings: (settings: AppSettings) => void;
   updateLastChecked: (trackId: string) => void;
 }
 
@@ -17,12 +19,14 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [settings, setSettings] = useState<AppSettings>({ requireUnconfirmDialog: false });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setTracks(storage.getTracks());
     setCurrentUser(storage.getUser());
+    setSettings(storage.getSettings());
   }, []);
 
   useEffect(() => {
@@ -105,6 +109,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ));
   };
 
+  const updateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    storage.saveSettings(newSettings);
+  };
+
   const setUser = (user: User) => {
     setCurrentUser(user);
     storage.saveUser(user);
@@ -114,10 +123,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       tracks,
       currentUser,
+      settings,
       addCar,
       confirmCar,
       unconfirmCar,
       setUser,
+      updateSettings,
       updateLastChecked,
     }}>
       {children}

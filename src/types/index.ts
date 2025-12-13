@@ -21,3 +21,7 @@ export interface User {
   name: string;
   crewId: string;
 }
+
+export interface AppSettings {
+  requireUnconfirmDialog: boolean;
+}

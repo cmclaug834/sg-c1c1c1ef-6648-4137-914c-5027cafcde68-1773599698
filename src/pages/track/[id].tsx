@@ -2,13 +2,15 @@ import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { ArrowLeft, Plus, CheckCircle2, Circle } from "lucide-react";
 import { useState } from "react";
+import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 
 export default function TrackDetail() {
-  const { tracks, confirmCar, unconfirmCar } = useApp();
+  const { tracks, confirmCar, unconfirmCar, settings } = useApp();
   const router = useRouter();
   const { id } = router.query;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUnconfirmedOnly, setShowUnconfirmedOnly] = useState(false);
+  const [unconfirmDialogCar, setUnconfirmDialogCar] = useState<{ trackId: string; carId: string; carNumber: string } | null>(null);
 
   const track = tracks.find(t => t.id === id);
 
@@ -20,11 +22,22 @@ export default function TrackDetail() {
     );
   }
 
-  const handleToggleConfirm = (carId: string, currentStatus: string) => {
+  const handleToggleConfirm = (carId: string, currentStatus: string, carNumber: string) => {
     if (currentStatus === "confirmed") {
-      unconfirmCar(track.id, carId);
+      if (settings.requireUnconfirmDialog) {
+        setUnconfirmDialogCar({ trackId: track.id, carId, carNumber });
+      } else {
+        unconfirmCar(track.id, carId);
+      }
     } else {
       confirmCar(track.id, carId);
+    }
+  };
+
+  const handleUnconfirmConfirmed = () => {
+    if (unconfirmDialogCar) {
+      unconfirmCar(unconfirmDialogCar.trackId, unconfirmDialogCar.carId);
+      setUnconfirmDialogCar(null);
     }
   };
 
@@ -120,7 +133,7 @@ export default function TrackDetail() {
               {filteredCars.map(car => (
                 <button
                   key={car.id}
-                  onClick={() => handleToggleConfirm(car.id, car.status)}
+                  onClick={() => handleToggleConfirm(car.id, car.status, car.carNumber)}
                   className="B.carRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors"
                 >
                   <div className="flex items-center gap-4">
@@ -187,6 +200,15 @@ export default function TrackDetail() {
         <AddCarModal
           trackId={track.id}
           onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {/* Unconfirm Confirmation Dialog */}
+      {unconfirmDialogCar && (
+        <UnconfirmDialog
+          carNumber={unconfirmDialogCar.carNumber}
+          onCancel={() => setUnconfirmDialogCar(null)}
+          onConfirm={handleUnconfirmConfirmed}
         />
       )}
     </div>

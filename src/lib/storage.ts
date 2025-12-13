@@ -1,8 +1,9 @@
-import { Track, User } from "@/types";
+import { Track, User, AppSettings } from "@/types";
 
 const STORAGE_KEYS = {
   TRACKS: "rail_yard_tracks",
   USER: "rail_yard_user",
+  SETTINGS: "rail_yard_settings",
 };
 
 export const storage = {
@@ -26,6 +27,17 @@ export const storage = {
   saveUser: (user: User) => {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  },
+
+  getSettings: (): AppSettings => {
+    if (typeof window === "undefined") return { requireUnconfirmDialog: false };
+    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    return data ? JSON.parse(data) : { requireUnconfirmDialog: false };
+  },
+
+  saveSettings: (settings: AppSettings) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   },
 };
 
