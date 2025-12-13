@@ -1,3 +1,5 @@
+import { normalizeCarId } from "@/lib/carIdFormatter";
+
 interface UnconfirmDialogProps {
   carNumber: string;
   onCancel: () => void;
@@ -19,7 +21,7 @@ export function UnconfirmDialog({ carNumber, onCancel, onConfirm }: UnconfirmDia
         </p>
         
         <p className="text-zinc-500 text-base mb-6">
-          Car: <span className="font-mono font-semibold">{carNumber}</span>
+          Car: <span className="font-mono font-semibold">{normalizeCarId(carNumber)}</span>
         </p>
 
         <div className="flex gap-3">

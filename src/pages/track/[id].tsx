@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { ArrowLeft, Plus, CheckCircle2, Circle } from "lucide-react";
 import { useState } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
+import { normalizeCarId } from "@/lib/carIdFormatter";
 
 export default function TrackDetail() {
   const { tracks, confirmCar, unconfirmCar, settings } = useApp();
@@ -149,7 +150,7 @@ export default function TrackDetail() {
                     <div className="flex-1 min-w-0">
                       {/* B.carNumber */}
                       <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
-                        {car.carNumber}
+                        {normalizeCarId(car.carNumber)}
                       </div>
                       
                       <div className="text-zinc-400 text-base md:text-lg mb-1">
@@ -206,7 +207,7 @@ export default function TrackDetail() {
       {/* Unconfirm Confirmation Dialog */}
       {unconfirmDialogCar && (
         <UnconfirmDialog
-          carNumber={unconfirmDialogCar.carNumber}
+          carNumber={normalizeCarId(unconfirmDialogCar.carNumber)}
           onCancel={() => setUnconfirmDialogCar(null)}
           onConfirm={handleUnconfirmConfirmed}
         />
@@ -226,7 +227,7 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
     e.preventDefault();
     if (carNumber.trim()) {
       addCar(trackId, {
-        carNumber: carNumber.trim(),
+        carNumber: normalizeCarId(carNumber.trim()),
         carType,
       });
       onClose();
