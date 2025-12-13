@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { ArrowLeft, AlertTriangle, X } from "lucide-react";
 import { useState } from "react";
 import { normalizeCarId } from "@/lib/carIdFormatter";
+import { TrackPickerModal } from "@/components/TrackPickerModal";
 
 export default function ExceptionsReview() {
   const { tracks, moveCar } = useApp();
@@ -11,6 +12,7 @@ export default function ExceptionsReview() {
   
   const [selectedCars, setSelectedCars] = useState<Set<string>>(new Set());
   const [resolutions, setResolutions] = useState<Record<string, { type: "missing" | "move"; targetTrackId?: string; targetTrackName?: string }>>({});
+  const [showTrackPicker, setShowTrackPicker] = useState(false);
 
   const track = tracks.find(t => t.id === id);
   const unconfirmedCars = track?.cars.filter(car => car.status === "pending") || [];
@@ -128,19 +130,14 @@ export default function ExceptionsReview() {
                 Mark as Missing
               </button>
 
-              {/* E.moveToTrackBtns */}
-              <div className="space-y-2">
-                <div className="text-xs text-zinc-500 uppercase tracking-wide">Move to:</div>
-                {otherTracks.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => moveToTrack(t.id)}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-base font-medium transition-colors"
-                  >
-                    {t.name}
-                  </button>
-                ))}
-              </div>
+              {/* E.batchMoveBtn */}
+              <button
+                id="E.batchMoveBtn"
+                onClick={() => setShowTrackPicker(true)}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-base font-medium transition-colors"
+              >
+                Move to Track
+              </button>
             </div>
           )}
         </div>
@@ -241,6 +238,28 @@ export default function ExceptionsReview() {
           </button>
         </div>
       </div>
+
+      {/* Track Picker Modal */}
+      {showTrackPicker && (
+        <TrackPickerModal
+          onSelectTrack={(targetTrackId, targetTrackName) => {
+            const newResolutions = { ...resolutions };
+            selectedCars.forEach(carId => {
+              newResolutions[carId] = { 
+                type: "move", 
+                targetTrackId: targetTrackId,
+                targetTrackName: targetTrackName 
+              };
+            });
+            setResolutions(newResolutions);
+            setSelectedCars(new Set());
+            setShowTrackPicker(false);
+          }}
+          onCancel={() => setShowTrackPicker(false)}
+          excludeTrackId={track?.id}
+          title="Move to which track?"
+        />
+      )}
     </div>
   );
 }
