@@ -1,17 +1,19 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
 
 export default function TrackDetail() {
-  const { tracks, confirmCar, unconfirmCar, settings } = useApp();
+  const { tracks, confirmCar, unconfirmCar, settings, moveCar } = useApp();
   const router = useRouter();
   const { id } = router.query;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUnconfirmedOnly, setShowUnconfirmedOnly] = useState(false);
   const [unconfirmDialogCar, setUnconfirmDialogCar] = useState<{ trackId: string; carId: string; carNumber: string } | null>(null);
+  const [movePickerCar, setMovePickerCar] = useState<{ carId: string; carNumber: string } | null>(null);
+  const [moveToast, setMoveToast] = useState<string | null>(null);
 
   const track = tracks.find(t => t.id === id);
 
@@ -31,7 +33,6 @@ export default function TrackDetail() {
         unconfirmCar(track.id, carId);
       }
     } else if (currentStatus === "missing") {
-      // Missing cars cannot be toggled directly
       return;
     } else {
       confirmCar(track.id, carId);
@@ -45,29 +46,47 @@ export default function TrackDetail() {
     }
   };
 
+  const handleMoveCar = (carId: string, carNumber: string) => {
+    setMovePickerCar({ carId, carNumber });
+  };
+
+  const handleMoveToTrack = (targetTrackId: string, targetTrackName: string) => {
+    if (!movePickerCar) return;
+
+    const success = moveCar(movePickerCar.carId, track.id, targetTrackId, "DAY_MOVE");
+    
+    if (success) {
+      setMoveToast(`Moved to ${targetTrackName}`);
+      setTimeout(() => setMoveToast(null), 3000);
+    } else {
+      setMoveToast(`Cannot move: duplicate or error`);
+      setTimeout(() => setMoveToast(null), 3000);
+    }
+    
+    setMovePickerCar(null);
+  };
+
   const handleDone = () => {
     const unconfirmedCars = track.cars.filter(car => car.status === "pending");
     
-    // If all cars confirmed, return to track list
     if (unconfirmedCars.length === 0) {
       router.push("/");
       return;
     }
 
-    // If resolveOnDone is ON, open Exceptions Review (Screen E)
     if (settings.resolveOnDone) {
       router.push(`/exceptions/${track.id}`);
       return;
     }
 
-    // If resolveOnDone is OFF, mark unconfirmed as "missing" and return
-    // This marks them as unresolved for later review
     router.push("/");
   };
 
   const filteredCars = showUnconfirmedOnly 
     ? track.cars.filter(car => car.status === "pending")
     : track.cars;
+
+  const otherTracks = tracks.filter(t => t.id !== track.id && t.enabled !== false);
 
   const formatConfirmedTime = (timestamp?: string) => {
     if (!timestamp) return null;
@@ -88,7 +107,6 @@ export default function TrackDetail() {
       <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            {/* B.backBtn */}
             <button
               id="B.backBtn"
               onClick={() => router.push("/")}
@@ -98,7 +116,6 @@ export default function TrackDetail() {
               <ArrowLeft className="w-7 h-7 md:w-8 md:h-8" />
             </button>
             
-            {/* B.trackTitle */}
             <h1 id="B.trackTitle" className="text-2xl md:text-3xl font-bold tracking-tight">
               {track.name}
             </h1>
@@ -106,7 +123,6 @@ export default function TrackDetail() {
             <div className="w-14 md:w-16" />
           </div>
 
-          {/* B.progressText */}
           <div id="B.progressText" className="bg-zinc-800 p-4 rounded-xl mb-4">
             <div className="flex justify-between items-center text-lg md:text-xl">
               <span className="text-zinc-400">Progress:</span>
@@ -116,7 +132,6 @@ export default function TrackDetail() {
             </div>
           </div>
 
-          {/* B.filterToggle */}
           <button
             id="B.filterToggle"
             onClick={() => setShowUnconfirmedOnly(!showUnconfirmedOnly)}
@@ -155,58 +170,69 @@ export default function TrackDetail() {
           ) : (
             <div className="space-y-3">
               {filteredCars.map(car => (
-                <button
+                <div
                   key={car.id}
-                  onClick={() => handleToggleConfirm(car.id, car.status, car.carNumber)}
-                  disabled={car.status === "missing"}
-                  className="B.carRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="B.carRow bg-zinc-800 rounded-xl overflow-hidden"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* B.confirmStateIcon */}
-                    <div className="B.confirmStateIcon flex-shrink-0">
-                      {car.status === "confirmed" ? (
-                        <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
-                      ) : car.status === "missing" ? (
-                        <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
-                      ) : (
-                        <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      {/* B.carNumber */}
-                      <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
-                        {normalizeCarId(car.carNumber)}
-                      </div>
-                      
-                      <div className="text-zinc-400 text-base md:text-lg mb-1">
-                        {car.carType}
-                      </div>
-
-                      {/* B.lastConfirmedText */}
-                      {car.status === "confirmed" && car.confirmedAt && (
-                        <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
-                          Confirmed {formatConfirmedTime(car.confirmedAt)}
-                          {car.confirmedBy && ` by ${car.confirmedBy}`}
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => handleToggleConfirm(car.id, car.status, car.carNumber)}
+                      disabled={car.status === "missing"}
+                      className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="B.confirmStateIcon flex-shrink-0">
+                          {car.status === "confirmed" ? (
+                            <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
+                          ) : car.status === "missing" ? (
+                            <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
+                          ) : (
+                            <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
+                          )}
                         </div>
-                      )}
 
-                      {/* B.missingSubtext */}
-                      {car.status === "missing" && (
-                        <div className="B.missingSubtext text-yellow-500 text-sm md:text-base">
-                          Marked missing in morning check
+                        <div className="flex-1 min-w-0">
+                          <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
+                            {normalizeCarId(car.carNumber)}
+                          </div>
+                          
+                          <div className="text-zinc-400 text-base md:text-lg mb-1">
+                            {car.carType}
+                          </div>
+
+                          {car.status === "confirmed" && car.confirmedAt && (
+                            <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
+                              Confirmed {formatConfirmedTime(car.confirmedAt)}
+                              {car.confirmedBy && ` by ${car.confirmedBy}`}
+                            </div>
+                          )}
+
+                          {car.status === "missing" && (
+                            <div className="B.missingSubtext text-yellow-500 text-sm md:text-base">
+                              Marked missing in morning check
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    </button>
+
+                    {/* B.rowMenuBtn */}
+                    <button
+                      id="B.rowMenuBtn"
+                      onClick={() => handleMoveCar(car.id, car.carNumber)}
+                      className="p-6 hover:bg-zinc-700 transition-colors border-l border-zinc-700"
+                      aria-label="Car actions"
+                    >
+                      <MoreVertical className="w-6 h-6 md:w-7 md:h-7 text-zinc-400" />
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* B.addCarFab */}
       <button
         id="B.addCarFab"
         onClick={() => setShowAddModal(true)}
@@ -216,7 +242,6 @@ export default function TrackDetail() {
         <Plus className="w-8 h-8 md:w-10 md:h-10 text-white" />
       </button>
 
-      {/* B.doneBtn */}
       <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
         <div className="max-w-4xl mx-auto p-4">
           <button
@@ -244,6 +269,45 @@ export default function TrackDetail() {
           onCancel={() => setUnconfirmDialogCar(null)}
           onConfirm={handleUnconfirmConfirmed}
         />
+      )}
+
+      {/* Move Track Picker Modal */}
+      {movePickerCar && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <h2 className="text-2xl font-bold mb-2">Move Car</h2>
+            <p className="text-zinc-400 text-base mb-6">
+              {normalizeCarId(movePickerCar.carNumber)}
+            </p>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto mb-6">
+              {otherTracks.map(t => (
+                <button
+                  key={t.id}
+                  id="B.rowActionMove"
+                  onClick={() => handleMoveToTrack(t.id, t.name)}
+                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium text-left px-4 transition-colors"
+                >
+                  Move to {t.name}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setMovePickerCar(null)}
+              className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* B.moveConfirmToast */}
+      {moveToast && (
+        <div id="B.moveConfirmToast" className="fixed top-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-zinc-700">
+          <p className="text-base md:text-lg font-medium">{moveToast}</p>
+        </div>
       )}
     </div>
   );
@@ -289,14 +353,12 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
                 autoFocus
               />
               
-              {/* C.normalizedPreview - Live preview of normalized format */}
               {carNumber.trim() && normalizedPreview && (
                 <div id="C.normalizedPreview" className="mt-2 text-zinc-400 text-base">
                   Will save as: <span className="font-mono font-semibold text-white">{normalizedPreview}</span>
                 </div>
               )}
 
-              {/* C.duplicateWarn - Validation message */}
               {carNumber.trim() && !isValid && (
                 <div id="C.duplicateWarn" className="mt-2 text-yellow-500 text-sm">
                   Enter letters + numbers (example: TBOX 663566)
