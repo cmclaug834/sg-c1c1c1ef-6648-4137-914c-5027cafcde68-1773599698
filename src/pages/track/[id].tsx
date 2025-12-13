@@ -8,6 +8,7 @@ export default function TrackDetail() {
   const router = useRouter();
   const { id } = router.query;
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showUnconfirmedOnly, setShowUnconfirmedOnly] = useState(false);
 
   const track = tracks.find(t => t.id === id);
 
@@ -27,68 +28,161 @@ export default function TrackDetail() {
     }
   };
 
+  const filteredCars = showUnconfirmedOnly 
+    ? track.cars.filter(car => car.status === "pending")
+    : track.cars;
+
+  const formatConfirmedTime = (timestamp?: string) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 60000);
+    
+    if (diff < 1) return "Just now";
+    if (diff < 60) return `${diff}m ago`;
+    const hours = Math.floor(diff / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-zinc-900 text-white flex flex-col">
+      {/* Header */}
+      <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            {/* B.backBtn */}
+            <button
+              id="B.backBtn"
+              onClick={() => router.push("/")}
+              className="p-3 hover:bg-zinc-800 rounded-lg transition-colors"
+              aria-label="Back to track list"
+            >
+              <ArrowLeft className="w-7 h-7 md:w-8 md:h-8" />
+            </button>
+            
+            {/* B.trackTitle */}
+            <h1 id="B.trackTitle" className="text-2xl md:text-3xl font-bold tracking-tight">
+              {track.name}
+            </h1>
+            
+            <div className="w-14 md:w-16" />
+          </div>
+
+          {/* B.progressText */}
+          <div id="B.progressText" className="bg-zinc-800 p-4 rounded-xl mb-4">
+            <div className="flex justify-between items-center text-lg md:text-xl">
+              <span className="text-zinc-400">Progress:</span>
+              <span className="font-mono font-bold text-2xl md:text-3xl">
+                {track.confirmedCars} / {track.totalCars}
+              </span>
+            </div>
+          </div>
+
+          {/* B.filterToggle */}
           <button
-            onClick={() => router.push("/")}
-            className="p-3 hover:bg-zinc-800 rounded-lg"
+            id="B.filterToggle"
+            onClick={() => setShowUnconfirmedOnly(!showUnconfirmedOnly)}
+            className={`w-full p-4 rounded-xl text-left transition-colors text-base md:text-lg font-medium ${
+              showUnconfirmedOnly 
+                ? "bg-yellow-600 hover:bg-yellow-700 text-white" 
+                : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+            }`}
           >
-            <ArrowLeft className="w-7 h-7" />
-          </button>
-          <h1 className="text-3xl font-bold tracking-tight">{track.name}</h1>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="p-3 bg-green-600 hover:bg-green-700 rounded-lg"
-          >
-            <Plus className="w-7 h-7" />
+            <div className="flex items-center justify-between">
+              <span>Unconfirmed only</span>
+              <div className={`w-12 h-7 rounded-full transition-colors relative ${
+                showUnconfirmedOnly ? "bg-yellow-800" : "bg-zinc-700"
+              }`}>
+                <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                  showUnconfirmedOnly ? "translate-x-5" : ""
+                }`} />
+              </div>
+            </div>
           </button>
         </div>
-
-        <div className="bg-zinc-800 p-4 rounded-xl mb-6">
-          <div className="flex justify-between text-lg">
-            <span className="text-zinc-400">Progress:</span>
-            <span className="font-mono font-bold">
-              {track.confirmedCars} / {track.totalCars}
-            </span>
-          </div>
-        </div>
-
-        {track.cars.length === 0 ? (
-          <div className="text-center py-12 text-zinc-500">
-            <p className="text-xl mb-2">No cars on this track</p>
-            <p>Tap + to add a car</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {track.cars.map(car => (
-              <button
-                key={car.id}
-                onClick={() => handleToggleConfirm(car.id, car.status)}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      {car.status === "confirmed" ? (
-                        <CheckCircle2 className="w-7 h-7 text-green-500 flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-7 h-7 text-zinc-600 flex-shrink-0" />
-                      )}
-                      <span className="text-2xl font-bold font-mono">{car.carNumber}</span>
-                    </div>
-                    <div className="ml-10 text-zinc-400">
-                      {car.carType}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
+      {/* B.carList */}
+      <div id="B.carList" className="flex-1 overflow-y-auto pb-24">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          {filteredCars.length === 0 ? (
+            <div className="text-center py-12 text-zinc-500">
+              <p className="text-xl md:text-2xl mb-2">
+                {showUnconfirmedOnly ? "All cars confirmed!" : "No cars on this track"}
+              </p>
+              {!showUnconfirmedOnly && (
+                <p className="text-base md:text-lg">Tap + to add a car</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredCars.map(car => (
+                <button
+                  key={car.id}
+                  onClick={() => handleToggleConfirm(car.id, car.status)}
+                  className="B.carRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    {/* B.confirmStateIcon */}
+                    <div className="B.confirmStateIcon flex-shrink-0">
+                      {car.status === "confirmed" ? (
+                        <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
+                      ) : (
+                        <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      {/* B.carNumber */}
+                      <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
+                        {car.carNumber}
+                      </div>
+                      
+                      <div className="text-zinc-400 text-base md:text-lg mb-1">
+                        {car.carType}
+                      </div>
+
+                      {/* B.lastConfirmedText */}
+                      {car.status === "confirmed" && car.confirmedAt && (
+                        <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
+                          Confirmed {formatConfirmedTime(car.confirmedAt)}
+                          {car.confirmedBy && ` by ${car.confirmedBy}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* B.addCarFab */}
+      <button
+        id="B.addCarFab"
+        onClick={() => setShowAddModal(true)}
+        className="fixed right-4 md:right-8 bottom-24 md:bottom-28 w-16 h-16 md:w-20 md:h-20 bg-green-600 hover:bg-green-700 rounded-full shadow-lg flex items-center justify-center transition-colors z-20"
+        aria-label="Add car"
+      >
+        <Plus className="w-8 h-8 md:w-10 md:h-10 text-white" />
+      </button>
+
+      {/* B.doneBtn */}
+      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
+        <div className="max-w-4xl mx-auto p-4">
+          <button
+            id="B.doneBtn"
+            onClick={() => router.push("/")}
+            className="w-full py-4 md:py-5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+
+      {/* Add Car Modal */}
       {showAddModal && (
         <AddCarModal
           trackId={track.id}
