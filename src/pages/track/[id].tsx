@@ -1,14 +1,14 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, Upload } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
 import { TrackPickerModal } from "@/components/TrackPickerModal";
 import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
 
 export default function TrackDetail() {
-  const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser } = useApp();
+  const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked } = useApp();
   const router = useRouter();
   const { id } = router.query;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -18,8 +18,20 @@ export default function TrackDetail() {
   const [moveToast, setMoveToast] = useState<string | null>(null);
   const [carActionMenu, setCarActionMenu] = useState<{ carId: string; carNumber: string } | null>(null);
   const [removeConfirmCar, setRemoveConfirmCar] = useState<{ carId: string; carNumber: string } | null>(null);
+  
+  // NEW: Pending changes tracking
+  const [pendingConfirmations, setPendingConfirmations] = useState<Set<string>>(new Set());
+  const [pendingUnconfirmations, setPendingUnconfirmations] = useState<Set<string>>(new Set());
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [commitToast, setCommitToast] = useState<string | null>(null);
 
   const track = tracks.find(t => t.id === id);
+
+  // NEW: Reset pending changes when track changes
+  useEffect(() => {
+    setPendingConfirmations(new Set());
+    setPendingUnconfirmations(new Set());
+  }, [id]);
 
   if (!track) {
     return (
@@ -29,23 +41,56 @@ export default function TrackDetail() {
     );
   }
 
+  // NEW: Check if there are pending changes
+  const hasPendingChanges = pendingConfirmations.size > 0 || pendingUnconfirmations.size > 0;
+
+  // NEW: Get effective car status (including pending changes)
+  const getEffectiveStatus = (carId: string, currentStatus: string) => {
+    if (pendingConfirmations.has(carId)) return "confirmed";
+    if (pendingUnconfirmations.has(carId)) return "pending";
+    return currentStatus;
+  };
+
   const handleToggleConfirm = (carId: string, currentStatus: string, carNumber: string) => {
-    if (currentStatus === "confirmed") {
+    if (currentStatus === "missing") {
+      return;
+    }
+
+    const effectiveStatus = getEffectiveStatus(carId, currentStatus);
+
+    if (effectiveStatus === "confirmed") {
+      // Handle unconfirm
       if (settings.requireUnconfirmDialog) {
         setUnconfirmDialogCar({ trackId: track.id, carId, carNumber });
       } else {
-        unconfirmCar(track.id, carId);
+        // NEW: Add to pending unconfirmations
+        setPendingUnconfirmations(prev => new Set(prev).add(carId));
+        setPendingConfirmations(prev => {
+          const next = new Set(prev);
+          next.delete(carId);
+          return next;
+        });
       }
-    } else if (currentStatus === "missing") {
-      return;
     } else {
-      confirmCar(track.id, carId);
+      // NEW: Add to pending confirmations
+      setPendingConfirmations(prev => new Set(prev).add(carId));
+      setPendingUnconfirmations(prev => {
+        const next = new Set(prev);
+        next.delete(carId);
+        return next;
+      });
     }
   };
 
   const handleUnconfirmConfirmed = () => {
     if (unconfirmDialogCar) {
-      unconfirmCar(unconfirmDialogCar.trackId, unconfirmDialogCar.carId);
+      // NEW: Add to pending unconfirmations
+      setPendingUnconfirmations(prev => new Set(prev).add(unconfirmDialogCar.carId));
+      setPendingConfirmations(prev => {
+        const next = new Set(prev);
+        next.delete(unconfirmDialogCar.carId);
+        return next;
+      });
       setUnconfirmDialogCar(null);
     }
   };
@@ -113,24 +158,53 @@ export default function TrackDetail() {
     setMovePickerCar(null);
   };
 
-  const handleDone = () => {
-    const unconfirmedCars = track.cars.filter(car => car.status === "pending");
-    
-    if (unconfirmedCars.length === 0) {
+  // NEW: Handle back button with pending changes check
+  const handleBack = () => {
+    if (hasPendingChanges) {
+      setShowDiscardDialog(true);
+    } else {
       router.push("/");
-      return;
     }
+  };
 
-    if (settings.resolveOnDone) {
-      router.push(`/exceptions/${track.id}`);
-      return;
-    }
-
+  // NEW: Discard pending changes and go back
+  const handleDiscardChanges = () => {
+    setPendingConfirmations(new Set());
+    setPendingUnconfirmations(new Set());
+    setShowDiscardDialog(false);
     router.push("/");
   };
 
+  // NEW: Commit all pending changes
+  const handleYardCheckCompleted = () => {
+    // Apply all pending confirmations
+    pendingConfirmations.forEach(carId => {
+      confirmCar(track.id, carId);
+    });
+
+    // Apply all pending unconfirmations
+    pendingUnconfirmations.forEach(carId => {
+      unconfirmCar(track.id, carId);
+    });
+
+    // Update last checked timestamp
+    updateLastChecked(track.id);
+
+    // Clear pending changes
+    setPendingConfirmations(new Set());
+    setPendingUnconfirmations(new Set());
+
+    // Show success toast
+    setCommitToast(`Yard check saved for ${track.name}`);
+
+    // Navigate back after short delay
+    setTimeout(() => {
+      router.push("/");
+    }, 1500);
+  };
+
   const filteredCars = showUnconfirmedOnly 
-    ? track.cars.filter(car => car.status === "pending")
+    ? track.cars.filter(car => getEffectiveStatus(car.id, car.status) === "pending")
     : track.cars;
 
   const otherTracks = tracks.filter(t => t.id !== track.id && t.enabled !== false);
@@ -156,7 +230,7 @@ export default function TrackDetail() {
           <div className="flex items-center justify-between mb-4">
             <button
               id="B.backBtn"
-              onClick={() => router.push("/")}
+              onClick={handleBack}
               className="p-3 hover:bg-zinc-800 rounded-lg transition-colors"
               aria-label="Back to track list"
             >
@@ -181,9 +255,14 @@ export default function TrackDetail() {
             <div className="flex justify-between items-center text-lg md:text-xl">
               <span className="text-zinc-400">Progress:</span>
               <span className="font-mono font-bold text-2xl md:text-3xl">
-                {track.confirmedCars} / {track.totalCars}
+                {track.confirmedCars + pendingConfirmations.size - pendingUnconfirmations.size} / {track.totalCars}
               </span>
             </div>
+            {hasPendingChanges && (
+              <div className="mt-2 text-sm text-yellow-500">
+                {pendingConfirmations.size + pendingUnconfirmations.size} pending changes
+              </div>
+            )}
           </div>
 
           <button
@@ -210,7 +289,7 @@ export default function TrackDetail() {
       </div>
 
       {/* B.carList */}
-      <div id="B.carList" className="flex-1 overflow-y-auto pb-24">
+      <div id="B.carList" className="flex-1 overflow-y-auto pb-32">
         <div className="max-w-4xl mx-auto px-4 py-4">
           {filteredCars.length === 0 ? (
             <div className="text-center py-12 text-zinc-500">
@@ -223,65 +302,76 @@ export default function TrackDetail() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredCars.map(car => (
-                <div
-                  key={car.id}
-                  className="B.carRow bg-zinc-800 rounded-xl overflow-hidden"
-                >
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => handleToggleConfirm(car.id, car.status, car.carNumber)}
-                      disabled={car.status === "missing"}
-                      className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="B.confirmStateIcon flex-shrink-0">
-                          {car.status === "confirmed" ? (
-                            <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
-                          ) : car.status === "missing" ? (
-                            <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
-                          ) : (
-                            <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
-                          )}
-                        </div>
+              {filteredCars.map(car => {
+                const effectiveStatus = getEffectiveStatus(car.id, car.status);
+                const isPending = pendingConfirmations.has(car.id) || pendingUnconfirmations.has(car.id);
 
-                        <div className="flex-1 min-w-0">
-                          <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
-                            {normalizeCarId(car.carNumber)}
-                          </div>
-                          
-                          <div className="text-zinc-400 text-base md:text-lg mb-1">
-                            {car.carType}
+                return (
+                  <div
+                    key={car.id}
+                    className="B.carRow bg-zinc-800 rounded-xl overflow-hidden"
+                  >
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => handleToggleConfirm(car.id, car.status, car.carNumber)}
+                        disabled={car.status === "missing"}
+                        className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="B.confirmStateIcon flex-shrink-0">
+                            {effectiveStatus === "confirmed" ? (
+                              <CheckCircle2 className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-green-500'}`} />
+                            ) : car.status === "missing" ? (
+                              <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
+                            ) : (
+                              <Circle className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-zinc-600'}`} />
+                            )}
                           </div>
 
-                          {car.status === "confirmed" && car.confirmedAt && (
-                            <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
-                              Confirmed {formatConfirmedTime(car.confirmedAt)}
-                              {car.confirmedBy && ` by ${car.confirmedBy}`}
+                          <div className="flex-1 min-w-0">
+                            <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
+                              {normalizeCarId(car.carNumber)}
                             </div>
-                          )}
+                            
+                            <div className="text-zinc-400 text-base md:text-lg mb-1">
+                              {car.carType}
+                            </div>
 
-                          {car.status === "missing" && (
-                            <div className="B.missingSubtext text-yellow-500 text-sm md:text-base">
-                              Marked missing in morning check
-                            </div>
-                          )}
+                            {isPending && (
+                              <div className="text-yellow-500 text-sm md:text-base">
+                                Pending: {effectiveStatus === "confirmed" ? "will confirm" : "will unconfirm"}
+                              </div>
+                            )}
+
+                            {!isPending && effectiveStatus === "confirmed" && car.confirmedAt && (
+                              <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
+                                Confirmed {formatConfirmedTime(car.confirmedAt)}
+                                {car.confirmedBy && ` by ${car.confirmedBy}`}
+                              </div>
+                            )}
+
+                            {car.status === "missing" && (
+                              <div className="B.missingSubtext text-yellow-500 text-sm md:text-base">
+                                Marked missing in morning check
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </button>
+                      </button>
 
-                    {/* B.rowMenuBtn */}
-                    <button
-                      id="B.rowMenuBtn"
-                      onClick={() => setCarActionMenu({ carId: car.id, carNumber: car.carNumber })}
-                      className="p-6 hover:bg-zinc-700 transition-colors border-l border-zinc-700"
-                      aria-label="Car actions"
-                    >
-                      <MoreVertical className="w-6 h-6 md:w-7 md:h-7 text-zinc-400" />
-                    </button>
+                      {/* B.rowMenuBtn */}
+                      <button
+                        id="B.rowMenuBtn"
+                        onClick={() => setCarActionMenu({ carId: car.id, carNumber: car.carNumber })}
+                        className="p-6 hover:bg-zinc-700 transition-colors border-l border-zinc-700"
+                        aria-label="Car actions"
+                      >
+                        <MoreVertical className="w-6 h-6 md:w-7 md:h-7 text-zinc-400" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -305,15 +395,25 @@ export default function TrackDetail() {
         <Upload className="w-8 h-8 md:w-10 md:h-10 text-white" />
       </button>
 
+      {/* NEW: Sticky Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
         <div className="max-w-4xl mx-auto p-4">
-          <button
-            id="B.doneBtn"
-            onClick={handleDone}
-            className="w-full py-4 md:py-5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
-          >
-            Done
-          </button>
+          <div className="flex gap-3">
+            <button
+              id="B.backActionBtn"
+              onClick={handleBack}
+              className="flex-1 py-4 md:py-5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
+            >
+              Back
+            </button>
+            <button
+              id="B.yardCheckCompletedBtn"
+              onClick={handleYardCheckCompleted}
+              className="flex-1 py-4 md:py-5 bg-green-600 hover:bg-green-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
+            >
+              Yard Check Completed
+            </button>
+          </div>
         </div>
       </div>
 
@@ -447,6 +547,48 @@ export default function TrackDetail() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* NEW: Discard Changes Dialog */}
+      {showDiscardDialog && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <h2 className="text-2xl font-bold mb-4">
+              Discard changes?
+            </h2>
+
+            <p className="text-zinc-400 text-lg mb-2">
+              You have {pendingConfirmations.size + pendingUnconfirmations.size} pending changes that haven't been saved.
+            </p>
+            
+            <p className="text-zinc-500 text-base mb-6">
+              These changes will be lost if you go back now.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDiscardDialog(false)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Stay
+              </button>
+
+              <button
+                onClick={handleDiscardChanges}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Commit Success Toast */}
+      {commitToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-green-700">
+          <p className="text-base md:text-lg font-medium">{commitToast}</p>
         </div>
       )}
 
