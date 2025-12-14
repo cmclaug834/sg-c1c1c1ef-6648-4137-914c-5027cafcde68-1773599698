@@ -138,7 +138,7 @@ export default function ImportCars() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pb-32">
+      <div className="flex-1 overflow-y-auto pb-44">
         <div className="max-w-4xl mx-auto px-4 py-4">
           {/* I.pasteTextArea */}
           <div className="mb-6">
@@ -239,14 +239,42 @@ export default function ImportCars() {
                   </div>
                 )}
               </div>
+
+              {/* Inline Action Row - Fix A */}
+              <div className="bg-zinc-800 rounded-xl p-5">
+                <div className="flex gap-3">
+                  {/* I.inlineBackToEditBtn */}
+                  <button
+                    id="I.inlineBackToEditBtn"
+                    onClick={handleBackToEdit}
+                    className="flex-1 py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-lg font-medium transition-colors"
+                  >
+                    Back to Edit
+                  </button>
+
+                  {/* I.inlineAddCarsBtn */}
+                  <button
+                    id="I.inlineAddCarsBtn"
+                    onClick={handleAddCars}
+                    disabled={preview.toAdd.length === 0}
+                    className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
+                      preview.toAdd.length > 0
+                        ? "bg-green-600 hover:bg-green-700"
+                        : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                    }`}
+                  >
+                    Add Cars
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Sticky Bottom Action Bar - Shows ONLY after preview */}
+      {/* Sticky Bottom Action Bar - Fix B: Hardened */}
       {preview && (
-        <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
+        <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="max-w-4xl mx-auto p-4">
             <div className="flex gap-3">
               {/* I.backToEditBtn */}
