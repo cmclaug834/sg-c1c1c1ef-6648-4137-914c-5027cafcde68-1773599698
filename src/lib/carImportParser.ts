@@ -3,9 +3,14 @@
  * Extracts car IDs from CN paste data (forgiving format)
  */
 
-interface ImportBuckets {
+export interface ImportBuckets {
   toAdd: string[];
   skipped: string[];
+  unrecognized: string[];
+}
+
+export interface ExtractedCarData {
+  recognized: string[];
   unrecognized: string[];
 }
 
@@ -14,7 +19,7 @@ interface ImportBuckets {
  * Accepts formats: MARK123456, MARK 123456, etc.
  * Returns normalized IDs: MARK 123456 (with space)
  */
-export function extractCarIds(rawText: string): string[] {
+export function extractCarIds(rawText: string): ExtractedCarData {
   const lines = rawText.split(/[\r\n]+/);
   const carIds = new Set<string>();
   const unrecognized: string[] = [];
