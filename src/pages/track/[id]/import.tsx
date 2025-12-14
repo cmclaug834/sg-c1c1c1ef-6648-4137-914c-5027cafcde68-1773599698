@@ -3,9 +3,10 @@ import { useRouter } from "next/router";
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { useState, useRef } from "react";
 import { extractCarIds, computeImportBuckets } from "@/lib/carImportParser";
+import type { ExtractedCar } from "@/lib/carImportParser";
 
 interface PreviewData {
-  toAdd: string[];
+  toAdd: ExtractedCar[];
   skipped: string[];
   unrecognized: string[];
 }
@@ -22,6 +23,7 @@ export default function ImportCars() {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showDuplicateReview, setShowDuplicateReview] = useState(false);
   const [selectedDuplicates, setSelectedDuplicates] = useState<Set<string>>(new Set());
+  const [expandedCars, setExpandedCars] = useState<Set<string>>(new Set());
   const willAddSectionRef = useRef<HTMLDivElement>(null);
 
   const track = tracks.find(t => t.id === id);
@@ -47,8 +49,13 @@ export default function ImportCars() {
     // Compute buckets
     const buckets = computeImportBuckets(recognized, existingToday, existingSnapshot);
 
+    // Map buckets.toAdd back to ExtractedCar format with source info
+    const toAddWithSource = recognized.filter(car => 
+      buckets.toAdd.includes(car.normalized)
+    );
+
     setPreview({
-      toAdd: buckets.toAdd,
+      toAdd: toAddWithSource,
       skipped: buckets.skipped,
       unrecognized,
     });
@@ -62,9 +69,20 @@ export default function ImportCars() {
     }, 100);
   };
 
+  const toggleCarExpand = (carId: string) => {
+    const newExpanded = new Set(expandedCars);
+    if (newExpanded.has(carId)) {
+      newExpanded.delete(carId);
+    } else {
+      newExpanded.add(carId);
+    }
+    setExpandedCars(newExpanded);
+  };
+
   const handleClear = () => {
     setPasteText("");
     setPreview(null);
+    setExpandedCars(new Set());
   };
 
   const handleCancel = () => {
@@ -84,13 +102,18 @@ export default function ImportCars() {
   };
 
   const handleAddNewOnly = () => {
+    if (!preview) return;
     setShowDuplicateDialog(false);
-    executeImport(preview!.toAdd);
+    const carsToAdd = preview.toAdd.map(car => car.normalized);
+    executeImport(carsToAdd);
   };
 
   const handleAddEverything = () => {
     if (!preview) return;
-    const allCars = [...preview.toAdd, ...preview.skipped];
+    const allCars = [
+      ...preview.toAdd.map(car => car.normalized),
+      ...preview.skipped
+    ];
     setShowDuplicateDialog(false);
     executeImport(allCars);
   };
@@ -113,7 +136,10 @@ export default function ImportCars() {
 
   const handleConfirmDuplicateSelection = () => {
     if (!preview) return;
-    const carsToAdd = [...preview.toAdd, ...Array.from(selectedDuplicates)];
+    const carsToAdd = [
+      ...preview.toAdd.map(car => car.normalized),
+      ...Array.from(selectedDuplicates)
+    ];
     setShowDuplicateReview(false);
     executeImport(carsToAdd);
   };
@@ -143,7 +169,8 @@ export default function ImportCars() {
   const handleSimpleConfirm = () => {
     if (!preview) return;
     setShowConfirmDialog(false);
-    executeImport(preview.toAdd);
+    const carsToAdd = preview.toAdd.map(car => car.normalized);
+    executeImport(carsToAdd);
   };
 
   const handleBackToEdit = () => {
@@ -240,11 +267,45 @@ export default function ImportCars() {
                   <p className="text-zinc-500 text-base">No new cars to add</p>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {preview.toAdd.map((carId, idx) => (
-                      <div key={idx} className="bg-zinc-900 p-3 rounded-lg">
-                        <span className="font-mono text-lg">{carId}</span>
-                      </div>
-                    ))}
+                    {preview.toAdd.map((car, idx) => {
+                      const isExpanded = expandedCars.has(car.normalized);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => toggleCarExpand(car.normalized)}
+                          className="w-full bg-zinc-900 p-3 rounded-lg text-left hover:bg-zinc-800 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-lg">{car.normalized}</span>
+                            <svg
+                              className={`w-5 h-5 text-zinc-500 transition-transform ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                          
+                          {isExpanded && (
+                            <div className="mt-3 pt-3 border-t border-zinc-700 space-y-2 text-sm">
+                              <div>
+                                <span className="text-zinc-500">Normalized: </span>
+                                <span className="text-zinc-300 font-mono">{car.normalized}</span>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500">Source: </span>
+                                <span className="text-zinc-400 break-all">
+                                  {car.source || "(not available)"}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

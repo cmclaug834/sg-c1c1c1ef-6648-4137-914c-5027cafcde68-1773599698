@@ -9,8 +9,13 @@ export interface ImportBuckets {
   unrecognized: string[];
 }
 
+export interface ExtractedCar {
+  normalized: string;
+  source: string;
+}
+
 export interface ExtractedCarData {
-  recognized: string[];
+  recognized: ExtractedCar[];
   unrecognized: string[];
 }
 
@@ -21,7 +26,7 @@ export interface ExtractedCarData {
  */
 export function extractCarIds(rawText: string): ExtractedCarData {
   const lines = rawText.split(/[\r\n]+/);
-  const carIds = new Set<string>();
+  const carMap = new Map<string, string>(); // normalized -> source
   const unrecognized: string[] = [];
 
   // Regex to match reporting mark (2-4 letters) + number (3-7 digits)
@@ -40,7 +45,10 @@ export function extractCarIds(rawText: string): ExtractedCarData {
         const mark = match[1].toUpperCase();
         const number = match[2];
         const normalized = `${mark} ${number}`;
-        carIds.add(normalized);
+        // Store first occurrence of each normalized ID with its source line
+        if (!carMap.has(normalized)) {
+          carMap.set(normalized, trimmed);
+        }
       });
     } else {
       // Line didn't match pattern - add to unrecognized if not empty
@@ -50,8 +58,13 @@ export function extractCarIds(rawText: string): ExtractedCarData {
     }
   });
 
+  const recognized: ExtractedCar[] = Array.from(carMap.entries()).map(([normalized, source]) => ({
+    normalized,
+    source,
+  }));
+
   return {
-    recognized: Array.from(carIds),
+    recognized,
     unrecognized,
   };
 }
@@ -60,7 +73,7 @@ export function extractCarIds(rawText: string): ExtractedCarData {
  * Compute import buckets: what to add, what to skip, what's unrecognized
  */
 export function computeImportBuckets(
-  incoming: string[],
+  incoming: ExtractedCar[],
   existingToday: string[],
   existingSnapshot: string[] = []
 ): ImportBuckets {
@@ -73,12 +86,12 @@ export function computeImportBuckets(
   const toAdd: string[] = [];
   const skipped: string[] = [];
 
-  incoming.forEach(carId => {
-    const normalized = carId.toUpperCase().trim();
+  incoming.forEach(car => {
+    const normalized = car.normalized.toUpperCase().trim();
     if (blocked.has(normalized)) {
-      skipped.push(carId);
+      skipped.push(car.normalized);
     } else {
-      toAdd.push(carId);
+      toAdd.push(car.normalized);
       blocked.add(normalized); // Prevent duplicates within incoming list
     }
   });
