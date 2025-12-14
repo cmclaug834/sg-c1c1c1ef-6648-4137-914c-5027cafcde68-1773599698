@@ -18,6 +18,10 @@ export default function ImportCars() {
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [importToast, setImportToast] = useState<string | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showDuplicateReview, setShowDuplicateReview] = useState(false);
+  const [selectedDuplicates, setSelectedDuplicates] = useState<Set<string>>(new Set());
 
   const track = tracks.find(t => t.id === id);
 
@@ -58,25 +62,83 @@ export default function ImportCars() {
     router.push(`/track/${id}`);
   };
 
-  const handleConfirmImport = () => {
-    if (!preview || preview.toAdd.length === 0) return;
+  const handleConfirmClick = () => {
+    if (!preview) return;
 
-    // Add all new cars to the track
-    preview.toAdd.forEach(carNumber => {
-      addCar(track.id, {
+    if (preview.skipped.length === 0) {
+      // No duplicates - show simple confirmation
+      setShowConfirmDialog(true);
+    } else {
+      // Has duplicates - show duplicate dialog
+      setShowDuplicateDialog(true);
+    }
+  };
+
+  const handleAddNewOnly = () => {
+    setShowDuplicateDialog(false);
+    executeImport(preview!.toAdd);
+  };
+
+  const handleAddEverything = () => {
+    if (!preview) return;
+    const allCars = [...preview.toAdd, ...preview.skipped];
+    setShowDuplicateDialog(false);
+    executeImport(allCars);
+  };
+
+  const handleReviewDuplicates = () => {
+    setShowDuplicateDialog(false);
+    setShowDuplicateReview(true);
+    setSelectedDuplicates(new Set());
+  };
+
+  const toggleDuplicate = (carId: string) => {
+    const newSelected = new Set(selectedDuplicates);
+    if (newSelected.has(carId)) {
+      newSelected.delete(carId);
+    } else {
+      newSelected.add(carId);
+    }
+    setSelectedDuplicates(newSelected);
+  };
+
+  const handleConfirmDuplicateSelection = () => {
+    if (!preview) return;
+    const carsToAdd = [...preview.toAdd, ...Array.from(selectedDuplicates)];
+    setShowDuplicateReview(false);
+    executeImport(carsToAdd);
+  };
+
+  const executeImport = (carsToAdd: string[]) => {
+    // Add all cars to the track
+    carsToAdd.forEach(carNumber => {
+      addCar(track!.id, {
         carNumber,
         carType: "BOX", // Default type, user can edit later
       });
     });
 
-    // Show toast
-    const message = `Imported ${preview.toAdd.length} cars. Skipped ${preview.skipped.length} duplicates.`;
+    const skippedCount = preview!.skipped.length - selectedDuplicates.size;
+    const message = skippedCount > 0 
+      ? `Added ${carsToAdd.length} cars. Skipped ${skippedCount} duplicates.`
+      : `Added ${carsToAdd.length} cars.`;
+    
     setImportToast(message);
 
     // Return to track detail after short delay
     setTimeout(() => {
       router.push(`/track/${id}`);
     }, 2000);
+  };
+
+  const handleSimpleConfirm = () => {
+    if (!preview) return;
+    setShowConfirmDialog(false);
+    executeImport(preview.toAdd);
+  };
+
+  const handleBackToEdit = () => {
+    setPreview(null);
   };
 
   return (
@@ -220,35 +282,203 @@ export default function ImportCars() {
         </div>
       </div>
 
-      {/* Bottom Actions */}
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="flex gap-3">
-            {/* I.cancelBtn */}
-            <button
-              id="I.cancelBtn"
-              onClick={handleCancel}
-              className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-            >
-              Cancel
-            </button>
+      {/* Sticky Bottom Action Bar - Shows ONLY after preview */}
+      {preview && (
+        <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
+          <div className="max-w-4xl mx-auto p-4">
+            <div className="flex gap-3">
+              {/* I.backToEditBtn */}
+              <button
+                id="I.backToEditBtn"
+                onClick={handleBackToEdit}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Back to Edit
+              </button>
 
-            {/* I.confirmImportBtn */}
-            <button
-              id="I.confirmImportBtn"
-              onClick={handleConfirmImport}
-              disabled={!preview || preview.toAdd.length === 0}
-              className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
-                preview && preview.toAdd.length > 0
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-              }`}
-            >
-              Confirm Import ({preview?.toAdd.length || 0})
-            </button>
+              {/* I.confirmAddCarsBtn */}
+              <button
+                id="I.confirmAddCarsBtn"
+                onClick={handleConfirmClick}
+                disabled={preview.toAdd.length === 0 && selectedDuplicates.size === 0}
+                className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
+                  preview.toAdd.length > 0 || selectedDuplicates.size > 0
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                }`}
+              >
+                Confirm & Add Cars
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Simple Confirmation Dialog - No Duplicates */}
+      {showConfirmDialog && preview && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            {/* I.confirmDialogTitle */}
+            <h2 id="I.confirmDialogTitle" className="text-2xl font-bold mb-4">
+              Add Cars to Track
+            </h2>
+
+            {/* I.confirmDialogBody */}
+            <p id="I.confirmDialogBody" className="text-zinc-400 text-lg mb-6">
+              Add {preview.toAdd.length} cars to track {track.name}?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                id="I.confirmAddBtn"
+                onClick={handleSimpleConfirm}
+                className="flex-1 py-4 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Add Cars
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Detection Dialog */}
+      {showDuplicateDialog && preview && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            {/* I.duplicateDialogTitle */}
+            <h2 id="I.duplicateDialogTitle" className="text-2xl font-bold mb-4">
+              Duplicates Detected
+            </h2>
+
+            {/* I.duplicateDialogBody */}
+            <p id="I.duplicateDialogBody" className="text-zinc-400 text-lg mb-4">
+              Some cars already exist on this track. What would you like to do?
+            </p>
+
+            <div className="bg-zinc-800 rounded-lg p-4 mb-6">
+              <div className="space-y-2 text-base">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Will Add:</span>
+                  <span className="font-semibold text-green-400">{preview.toAdd.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Duplicates:</span>
+                  <span className="font-semibold text-yellow-400">{preview.skipped.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                id="I.addNewOnlyBtn"
+                onClick={handleAddNewOnly}
+                className="w-full py-4 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Add new cars only (recommended)
+              </button>
+
+              <button
+                id="I.addEverythingBtn"
+                onClick={handleAddEverything}
+                className="w-full py-4 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Add everything (including duplicates)
+              </button>
+
+              <button
+                id="I.reviewDuplicatesBtn"
+                onClick={handleReviewDuplicates}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Review duplicates
+              </button>
+
+              <button
+                onClick={() => setShowDuplicateDialog(false)}
+                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Review Checklist */}
+      {showDuplicateReview && preview && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6 my-8">
+            {/* I.reviewTitle */}
+            <h2 id="I.reviewTitle" className="text-2xl font-bold mb-4">
+              Review Duplicates
+            </h2>
+
+            {/* I.reviewSubtext */}
+            <p id="I.reviewSubtext" className="text-zinc-400 text-base mb-6">
+              Select which duplicate cars to include anyway:
+            </p>
+
+            {/* I.duplicateCheckList */}
+            <div id="I.duplicateCheckList" className="space-y-3 max-h-96 overflow-y-auto mb-6">
+              {preview.skipped.map((carId) => {
+                const isSelected = selectedDuplicates.has(carId);
+                return (
+                  <button
+                    key={carId}
+                    onClick={() => toggleDuplicate(carId)}
+                    className="w-full bg-zinc-800 hover:bg-zinc-700 p-4 rounded-lg text-left transition-colors flex items-center gap-4"
+                  >
+                    {/* Checkbox */}
+                    <div className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                      isSelected
+                        ? "bg-green-600 border-green-600"
+                        : "border-zinc-600"
+                    }`}>
+                      {isSelected && (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <span className="font-mono text-lg">{carId}</span>
+                      <p className="text-sm text-zinc-500">Include anyway</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDuplicateReview(false);
+                  setShowDuplicateDialog(true);
+                }}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Back
+              </button>
+
+              <button
+                id="I.confirmSelectionBtn"
+                onClick={handleConfirmDuplicateSelection}
+                className="flex-1 py-4 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Confirm ({preview.toAdd.length + selectedDuplicates.size})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* I.importToast */}
       {importToast && (
