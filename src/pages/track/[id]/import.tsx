@@ -1,7 +1,7 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { ArrowLeft, Upload, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { extractCarIds, computeImportBuckets } from "@/lib/carImportParser";
 
 interface PreviewData {
@@ -22,6 +22,7 @@ export default function ImportCars() {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showDuplicateReview, setShowDuplicateReview] = useState(false);
   const [selectedDuplicates, setSelectedDuplicates] = useState<Set<string>>(new Set());
+  const willAddSectionRef = useRef<HTMLDivElement>(null);
 
   const track = tracks.find(t => t.id === id);
 
@@ -38,7 +39,7 @@ export default function ImportCars() {
     const { recognized, unrecognized } = extractCarIds(pasteText);
 
     // Get existing car numbers from current track
-    const existingToday = track.cars.map(car => car.carNumber);
+    const existingToday = track?.cars.map(car => car.carNumber) || [];
 
     // TODO: Load existing snapshot when snapshot feature is implemented
     const existingSnapshot: string[] = [];
@@ -51,6 +52,14 @@ export default function ImportCars() {
       skipped: buckets.skipped,
       unrecognized,
     });
+
+    // Auto-scroll to preview results after state update
+    setTimeout(() => {
+      willAddSectionRef.current?.scrollIntoView({ 
+        behavior: "smooth", 
+        block: "start" 
+      });
+    }, 100);
   };
 
   const handleClear = () => {
@@ -223,7 +232,7 @@ export default function ImportCars() {
           {preview && (
             <div className="space-y-4">
               {/* I.willAddSection */}
-              <div id="I.willAddSection" className="bg-zinc-800 rounded-xl p-5">
+              <div id="I.willAddSection" ref={willAddSectionRef} className="bg-zinc-800 rounded-xl p-5">
                 <h3 className="text-xl font-bold text-green-400 mb-3">
                   Will Add ({preview.toAdd.length})
                 </h3>
