@@ -105,7 +105,7 @@ export default function ImportCars() {
     if (!preview) return;
     setShowDuplicateDialog(false);
     const carsToAdd = preview.toAdd.map(car => car.normalized);
-    executeImport(carsToAdd);
+    executeImport(carsToAdd, 0);
   };
 
   const handleAddEverything = () => {
@@ -115,7 +115,7 @@ export default function ImportCars() {
       ...preview.skipped
     ];
     setShowDuplicateDialog(false);
-    executeImport(allCars);
+    executeImport(allCars, preview.skipped.length);
   };
 
   const handleReviewDuplicates = () => {
@@ -141,10 +141,10 @@ export default function ImportCars() {
       ...Array.from(selectedDuplicates)
     ];
     setShowDuplicateReview(false);
-    executeImport(carsToAdd);
+    executeImport(carsToAdd, selectedDuplicates.size);
   };
 
-  const executeImport = (carsToAdd: string[]) => {
+  const executeImport = (carsToAdd: string[], includedDuplicatesCount: number) => {
     // Add all cars to the track
     carsToAdd.forEach(carNumber => {
       addCar(track!.id, {
@@ -153,7 +153,7 @@ export default function ImportCars() {
       });
     });
 
-    const skippedCount = preview!.skipped.length - selectedDuplicates.size;
+    const skippedCount = preview!.skipped.length - includedDuplicatesCount;
     const message = skippedCount > 0 
       ? `Added ${carsToAdd.length} cars. Skipped ${skippedCount} duplicates.`
       : `Added ${carsToAdd.length} cars.`;
@@ -170,7 +170,7 @@ export default function ImportCars() {
     if (!preview) return;
     setShowConfirmDialog(false);
     const carsToAdd = preview.toAdd.map(car => car.normalized);
-    executeImport(carsToAdd);
+    executeImport(carsToAdd, 0);
   };
 
   const handleBackToEdit = () => {
@@ -370,9 +370,9 @@ export default function ImportCars() {
               <button
                 id="I.confirmAddCarsBtn"
                 onClick={handleConfirmClick}
-                disabled={preview.toAdd.length === 0 && selectedDuplicates.size === 0}
+                disabled={preview.toAdd.length === 0 && preview.skipped.length === 0}
                 className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
-                  preview.toAdd.length > 0 || selectedDuplicates.size > 0
+                  preview.toAdd.length > 0 || preview.skipped.length > 0
                     ? "bg-green-600 hover:bg-green-700"
                     : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
                 }`}
