@@ -1,6 +1,6 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, Upload } from "lucide-react";
 import { useState } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -294,6 +294,15 @@ export default function TrackDetail() {
         aria-label="Add car"
       >
         <Plus className="w-8 h-8 md:w-10 md:h-10 text-white" />
+      </button>
+
+      <button
+        id="B.importBtn"
+        onClick={() => router.push(`/track/${id}/import`)}
+        className="fixed left-4 md:left-8 bottom-24 md:bottom-28 w-16 h-16 md:w-20 md:h-20 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center transition-colors z-20"
+        aria-label="Import cars from CN list"
+      >
+        <Upload className="w-8 h-8 md:w-10 md:h-10 text-white" />
       </button>
 
       <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
