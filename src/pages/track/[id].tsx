@@ -49,7 +49,7 @@ import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
 import { logDiagnostic } from "@/lib/diagnostics";
 
 export default function TrackDetail() {
-  const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked } = useApp();
+  const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked, saveTracks } = useApp();
   const router = useRouter();
   const { id } = router.query;
   const [showAddModal, setShowAddModal] = useState(false);
