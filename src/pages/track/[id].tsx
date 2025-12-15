@@ -6,6 +6,7 @@ import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
 import { TrackPickerModal } from "@/components/TrackPickerModal";
 import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
+import { logDiagnostic } from "@/lib/diagnostics";
 
 export default function TrackDetail() {
   const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked } = useApp();
@@ -58,6 +59,16 @@ export default function TrackDetail() {
 
     const effectiveStatus = getEffectiveStatus(carId, currentStatus);
 
+    // Log diagnostic before toggle
+    if (track) {
+      logDiagnostic(
+        "TOGGLE_CONFIRM_BEFORE",
+        track,
+        pendingConfirmations.size,
+        pendingUnconfirmations.size
+      );
+    }
+
     if (effectiveStatus === "confirmed") {
       // Handle unconfirm
       if (settings.requireUnconfirmDialog) {
@@ -79,6 +90,18 @@ export default function TrackDetail() {
         next.delete(carId);
         return next;
       });
+    }
+
+    // Log diagnostic after toggle
+    if (track) {
+      setTimeout(() => {
+        logDiagnostic(
+          "TOGGLE_CONFIRM_AFTER",
+          track,
+          pendingConfirmations.size,
+          pendingUnconfirmations.size
+        );
+      }, 100);
     }
   };
 
@@ -177,22 +200,69 @@ export default function TrackDetail() {
 
   // NEW: Commit all pending changes
   const handleYardCheckCompleted = () => {
+    if (!track) return;
+
+    // Log diagnostic at start of Done
+    logDiagnostic(
+      "DONE_COMMIT_START",
+      track,
+      pendingConfirmations.size,
+      pendingUnconfirmations.size
+    );
+
     // Apply all pending confirmations
     pendingConfirmations.forEach(carId => {
       confirmCar(track.id, carId);
     });
+
+    // Log after confirmations applied
+    logDiagnostic(
+      "DONE_AFTER_CONFIRMATIONS",
+      track,
+      pendingConfirmations.size,
+      pendingUnconfirmations.size
+    );
 
     // Apply all pending unconfirmations
     pendingUnconfirmations.forEach(carId => {
       unconfirmCar(track.id, carId);
     });
 
+    // Log after unconfirmations applied
+    logDiagnostic(
+      "DONE_AFTER_UNCONFIRMATIONS",
+      track,
+      0,
+      0
+    );
+
     // Update last checked timestamp
     updateLastChecked(track.id);
+
+    // Log after updateLastChecked
+    const updatedTrack = tracks.find(t => t.id === track.id);
+    if (updatedTrack) {
+      logDiagnostic(
+        "DONE_AFTER_LAST_CHECKED",
+        updatedTrack,
+        0,
+        0
+      );
+    }
 
     // Clear pending changes
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
+
+    // Log final state
+    if (updatedTrack) {
+      logDiagnostic(
+        "DONE_COMMIT_END",
+        updatedTrack,
+        0,
+        0
+      );
+    }
 
     // Show success toast
     setCommitToast(`Yard check saved for ${track.name}`);

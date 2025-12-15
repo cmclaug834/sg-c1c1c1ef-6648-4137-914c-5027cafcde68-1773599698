@@ -2,6 +2,8 @@ import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
+import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
+import type { DebugLogEntry } from "@/lib/diagnostics";
 
 export default function Settings() {
   const { currentUser, setUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks } = useApp();
@@ -17,6 +19,10 @@ export default function Settings() {
   const [newTrackInput, setNewTrackInput] = useState("");
   const [trackValidation, setTrackValidation] = useState("");
   const [localTracks, setLocalTracks] = useState<typeof tracks>([]);
+
+  const [showDebugLogs, setShowDebugLogs] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -128,6 +134,25 @@ export default function Settings() {
     saveTracks(localTracks);
     setTrackValidation("Changes saved successfully");
     setTimeout(() => setTrackValidation(""), 2000);
+  };
+
+  const handleViewDebugLogs = () => {
+    const logs = getDebugLogs();
+    setDebugLogs(logs.slice(-20).reverse()); // Show last 20, most recent first
+    setShowDebugLogs(true);
+  };
+
+  const handleClearDebugLogs = () => {
+    clearDebugLogs();
+    setDebugLogs([]);
+    setTrackValidation("Debug logs cleared");
+    setTimeout(() => setTrackValidation(""), 2000);
+  };
+
+  const handleCopyDebugLogs = async () => {
+    const success = await copyLogsToClipboard();
+    setCopySuccess(success);
+    setTimeout(() => setCopySuccess(false), 2000);
   };
 
   return (
@@ -404,7 +429,138 @@ export default function Settings() {
             </div>
           )}
         </div>
+
+        {/* NEW: Debug Section */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
+          <h2 className="text-2xl font-bold mb-6">Diagnostics</h2>
+
+          {/* D.viewDebugLogsBtn */}
+          <button
+            id="D.viewDebugLogsBtn"
+            onClick={handleViewDebugLogs}
+            className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+          >
+            View Debug Logs
+          </button>
+
+          {/* D.clearDebugLogsBtn */}
+          <button
+            id="D.clearDebugLogsBtn"
+            onClick={handleClearDebugLogs}
+            className="w-full mt-3 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+          >
+            Clear Debug Logs
+          </button>
+        </div>
       </div>
+
+      {/* Debug Logs Modal */}
+      {showDebugLogs && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-4xl border border-zinc-800 p-6 my-8 max-h-[90vh] overflow-hidden flex flex-col">
+            {/* D.debugLogsTitle */}
+            <h2 id="D.debugLogsTitle" className="text-2xl font-bold mb-4">
+              Debug Logs (Last 20)
+            </h2>
+
+            {/* D.debugLogsScroll */}
+            <div id="D.debugLogsScroll" className="flex-1 overflow-y-auto mb-6 space-y-4">
+              {debugLogs.length === 0 ? (
+                <p className="text-zinc-500 text-center py-8">No debug logs yet</p>
+              ) : (
+                debugLogs.map((log, idx) => {
+                  const { diagnostic } = log;
+                  const hasMismatch = diagnostic.mismatchFlags.totalMismatch || diagnostic.mismatchFlags.confirmedMismatch;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`bg-zinc-800 p-4 rounded-lg border-2 ${
+                        hasMismatch ? "border-red-500" : "border-zinc-700"
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="text-lg font-bold text-green-400 mb-1">
+                            {log.action}
+                          </div>
+                          <div className="text-sm text-zinc-500">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                        {hasMismatch && (
+                          <div className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold">
+                            ⚠️ MISMATCH
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Track Info */}
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-zinc-400">Track:</span>
+                          <span className="font-mono font-semibold">{diagnostic.trackName}</span>
+                        </div>
+
+                        {/* Total Cars */}
+                        <div className={`flex justify-between ${diagnostic.mismatchFlags.totalMismatch ? "text-red-400" : ""}`}>
+                          <span className="text-zinc-400">Total Cars:</span>
+                          <span className="font-mono">
+                            stored: {diagnostic.storedTotalCars} | actual: {diagnostic.carsLength}
+                            {diagnostic.mismatchFlags.totalMismatch && " ⚠️"}
+                          </span>
+                        </div>
+
+                        {/* Confirmed Cars */}
+                        <div className={`flex justify-between ${diagnostic.mismatchFlags.confirmedMismatch ? "text-red-400" : ""}`}>
+                          <span className="text-zinc-400">Confirmed:</span>
+                          <span className="font-mono">
+                            stored: {diagnostic.storedConfirmedCars} | actual: {diagnostic.computedConfirmedCars}
+                            {diagnostic.mismatchFlags.confirmedMismatch && " ⚠️"}
+                          </span>
+                        </div>
+
+                        {/* Pending Changes */}
+                        {(log.pendingConfirmations > 0 || log.pendingUnconfirmations > 0) && (
+                          <div className="flex justify-between text-yellow-400">
+                            <span>Pending:</span>
+                            <span className="font-mono">
+                              +{log.pendingConfirmations} / -{log.pendingUnconfirmations}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDebugLogs(false)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Close
+              </button>
+
+              <button
+                id="D.copyDebugLogsBtn"
+                onClick={handleCopyDebugLogs}
+                className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
+                  copySuccess
+                    ? "bg-green-600"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {copySuccess ? "✓ Copied!" : "Copy to Clipboard"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
