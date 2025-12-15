@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Track, User, RailCar, AppSettings, MoveLog } from "@/types";
 import { storage } from "@/lib/storage";
+import { logDiagnostic } from "@/lib/diagnostics";
 
 interface AppContextType {
   tracks: Track[];
@@ -73,11 +74,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
               }
             : car
         );
-        return {
+        const updatedTrack = {
           ...track,
           cars: updatedCars,
           confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
+
+        // Log diagnostic after confirm
+        logDiagnostic("CONFIRM_CAR", updatedTrack);
+
+        return updatedTrack;
       }
       return track;
     }));
@@ -96,11 +102,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
               }
             : car
         );
-        return {
+        const updatedTrack = {
           ...track,
           cars: updatedCars,
           confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
+
+        // Log diagnostic after unconfirm
+        logDiagnostic("UNCONFIRM_CAR", updatedTrack);
+
+        return updatedTrack;
       }
       return track;
     }));

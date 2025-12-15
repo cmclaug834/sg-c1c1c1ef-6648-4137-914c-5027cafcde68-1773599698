@@ -1,3 +1,43 @@
+/**
+ * CODE REVIEW REPORT - Track Detail Page
+ * ========================================
+ * 
+ * ISSUES FOUND:
+ * 
+ * 1. ❌ CRITICAL BUG - handleRemoveCar() persistence failure
+ *    - Builds updatedTracks array but never saves it
+ *    - Uses window.location.reload() hoping storage is updated
+ *    - Root cause of "X/Y counts drift from actual cars" bug
+ *    - FIX: Call saveTracks(updatedTracks) before showing toast
+ * 
+ * 2. ⚠️ DERIVED COUNTS - Progress display in header
+ *    - Uses stored track.confirmedCars + pending adjustments
+ *    - Should be safe IF confirmCar/unconfirmCar always update storage
+ *    - Added diagnostics to verify confirmCar/unconfirmCar consistency
+ * 
+ * 3. ✅ PENDING CHANGES LOGIC - Looks correct
+ *    - pendingConfirmations/pendingUnconfirmations are Sets (no duplicates)
+ *    - getEffectiveStatus() correctly prioritizes pending over stored status
+ *    - handleYardCheckCompleted() applies all pending before clearing
+ * 
+ * 4. ✅ NAVIGATION SAFETY - Correct
+ *    - handleBack() checks hasPendingChanges and shows discard dialog
+ *    - Only routes away after user confirms or no pending changes
+ * 
+ * 5. ✅ Z-INDEX LAYERING - Fixed in previous task
+ *    - Bottom bar: z-[9999] with pointer-events-auto
+ *    - Modals: z-50 (standard)
+ *    - No stacking conflicts observed
+ * 
+ * 6. ❌ REMOVE CAR FLOW - Critical bug (see #1)
+ *    - Must save updatedTracks, not rely on reload sync
+ * 
+ * DIAGNOSTICS ADDED:
+ * - logDiagnostic() calls at all key state transitions
+ * - Tracks before/after snapshots for Done button flow
+ * - Persists to localStorage for post-mortem analysis
+ */
+
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, Upload } from "lucide-react";
@@ -141,8 +181,7 @@ export default function TrackDetail() {
     const existingLogs = JSON.parse(localStorage.getItem("rail_yard_remove_logs") || "[]");
     localStorage.setItem("rail_yard_remove_logs", JSON.stringify([...existingLogs, removeLog]));
 
-    // Remove car from track using moveCar with special handling
-    // Find the car and remove it from the track
+    // FIXED: Build updated tracks AND save them (was missing saveTracks call)
     const updatedTracks = tracks.map(t => {
       if (t.id === track.id) {
         const updatedCars = t.cars.filter(c => c.id !== carId);
@@ -156,9 +195,14 @@ export default function TrackDetail() {
       return t;
     });
 
-    // Update via context (need to add removeCarFromTrack method or handle via direct storage)
-    // For now, we'll use a workaround with the existing context
-    window.location.reload(); // Force reload to sync with storage
+    // FIX: Save the updated tracks immediately
+    saveTracks(updatedTracks);
+
+    // Log diagnostic after save
+    const updatedTrack = updatedTracks.find(t => t.id === track.id);
+    if (updatedTrack) {
+      logDiagnostic("REMOVE_CAR_COMPLETE", updatedTrack);
+    }
 
     setRemoveConfirmCar(null);
     setMoveToast("Car removed from track");
