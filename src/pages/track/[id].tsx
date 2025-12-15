@@ -377,41 +377,44 @@ export default function TrackDetail() {
         </div>
       </div>
 
-      <button
-        id="B.addCarFab"
-        onClick={() => setShowAddModal(true)}
-        className="fixed right-4 md:right-8 bottom-24 md:bottom-28 w-16 h-16 md:w-20 md:h-20 bg-green-600 hover:bg-green-700 rounded-full shadow-lg flex items-center justify-center transition-colors z-20"
-        aria-label="Add car"
-      >
-        <Plus className="w-8 h-8 md:w-10 md:h-10 text-white" />
-      </button>
-
-      <button
-        id="B.importBtn"
-        onClick={() => router.push(`/track/${id}/import`)}
-        className="fixed left-4 md:left-8 bottom-24 md:bottom-28 w-16 h-16 md:w-20 md:h-20 bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg flex items-center justify-center transition-colors z-20"
-        aria-label="Import cars from CN list"
-      >
-        <Upload className="w-8 h-8 md:w-10 md:h-10 text-white" />
-      </button>
-
-      {/* NEW: Sticky Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-10">
+      {/* NEW: Consolidated Sticky Bottom Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="max-w-4xl mx-auto p-4">
-          <div className="flex gap-3">
+          <div className="grid grid-cols-4 gap-3">
+            {/* Back Button */}
             <button
               id="B.backActionBtn"
               onClick={handleBack}
-              className="flex-1 py-4 md:py-5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
+              className="py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-base md:text-lg font-bold transition-colors"
             >
               Back
             </button>
+
+            {/* Import Button */}
+            <button
+              id="B.importActionBtn"
+              onClick={() => router.push(`/track/${id}/import`)}
+              className="py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+            >
+              Import
+            </button>
+
+            {/* Add Car Button */}
+            <button
+              id="B.addCarActionBtn"
+              onClick={() => setShowAddModal(true)}
+              className="py-4 bg-green-600 hover:bg-green-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+            >
+              Add +
+            </button>
+
+            {/* Yard Check Completed Button */}
             <button
               id="B.yardCheckCompletedBtn"
               onClick={handleYardCheckCompleted}
-              className="flex-1 py-4 md:py-5 bg-green-600 hover:bg-green-700 rounded-xl text-xl md:text-2xl font-bold transition-colors"
+              className="py-4 bg-green-600 hover:bg-green-700 rounded-xl text-base md:text-lg font-bold transition-colors border-2 border-green-400"
             >
-              Yard Check Completed
+              Done
             </button>
           </div>
         </div>
