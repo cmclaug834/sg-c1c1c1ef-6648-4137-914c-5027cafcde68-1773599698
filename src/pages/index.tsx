@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { profileStorage, CrewProfile } from "@/lib/profileStorage";
 
 export default function FrontPage() {
-  const { setUser } = useApp();
+  const { setUser, siteName } = useApp();
   const router = useRouter();
   
   const [name, setName] = useState("");
@@ -77,7 +77,7 @@ export default function FrontPage() {
         {/* FRONT.headerTitle */}
         <div className="text-center mb-8">
           <h1 id="FRONT.headerTitle" className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
-            GCF Rail Yard
+            {siteName}
           </h1>
           
           {/* FRONT.headerDate */}

@@ -6,7 +6,7 @@ import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnos
 import type { DebugLogEntry } from "@/lib/diagnostics";
 
 export default function Settings() {
-  const { currentUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks } = useApp();
+  const { currentUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks, appName, siteName, updateBranding } = useApp();
   const router = useRouter();
   const [requireDialog, setRequireDialog] = useState(false);
   const [resolveOnDone, setResolveOnDone] = useState(true);
@@ -17,6 +17,9 @@ export default function Settings() {
   const [newTrackInput, setNewTrackInput] = useState("");
   const [trackValidation, setTrackValidation] = useState("");
   const [localTracks, setLocalTracks] = useState<typeof tracks>([]);
+
+  const [localAppName, setLocalAppName] = useState("");
+  const [localSiteName, setLocalSiteName] = useState("");
 
   const [showDebugLogs, setShowDebugLogs] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
@@ -34,8 +37,10 @@ export default function Settings() {
       setMovePlacement(settings.movePlacement ?? "append");
       setAdminManageTracks(settings.adminManageTracks ?? false);
       setLocalTracks(tracks);
+      setLocalAppName(appName);
+      setLocalSiteName(siteName);
     }
-  }, [mounted, settings, tracks]);
+  }, [mounted, settings, tracks, appName, siteName]);
 
   const handleToggleDialog = () => {
     const newValue = !requireDialog;
@@ -118,6 +123,12 @@ export default function Settings() {
     setTimeout(() => setTrackValidation(""), 2000);
   };
 
+  const handleSaveBranding = () => {
+    updateBranding(localAppName.trim() || "Rail Yard Tracker", localSiteName.trim() || "GFC Rail Yard");
+    setTrackValidation("Branding saved successfully");
+    setTimeout(() => setTrackValidation(""), 2000);
+  };
+
   const handleViewDebugLogs = () => {
     const logs = getDebugLogs();
     setDebugLogs(logs.slice(-20).reverse());
@@ -155,6 +166,46 @@ export default function Settings() {
             Settings
           </h1>
           <div className="w-14" />
+        </div>
+
+        {/* D.sectionBranding - NEW SECTION */}
+        <div id="D.sectionBranding" className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Branding</h2>
+
+          <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
+            {/* D.appNameField */}
+            <div id="D.appNameField">
+              <label className="block text-zinc-400 mb-2 text-base">App Name</label>
+              <input
+                type="text"
+                value={localAppName}
+                onChange={(e) => setLocalAppName(e.target.value)}
+                className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                placeholder="Rail Yard Tracker"
+              />
+            </div>
+
+            {/* D.siteNameField */}
+            <div id="D.siteNameField">
+              <label className="block text-zinc-400 mb-2 text-base">Site Name</label>
+              <input
+                type="text"
+                value={localSiteName}
+                onChange={(e) => setLocalSiteName(e.target.value)}
+                className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                placeholder="GFC Rail Yard"
+              />
+            </div>
+
+            {/* D.saveBrandingBtn */}
+            <button
+              id="D.saveBrandingBtn"
+              onClick={handleSaveBranding}
+              className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
+            >
+              Save Branding
+            </button>
+          </div>
         </div>
 
         {/* D.sectionConfirmations */}

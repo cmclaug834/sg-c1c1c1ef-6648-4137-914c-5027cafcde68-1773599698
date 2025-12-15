@@ -7,12 +7,15 @@ interface AppContextType {
   tracks: Track[];
   currentUser: User | null;
   settings: AppSettings;
+  appName: string;
+  siteName: string;
   addCar: (trackId: string, car: Omit<RailCar, "id" | "status">) => void;
   confirmCar: (trackId: string, carId: string) => void;
   unconfirmCar: (trackId: string, carId: string) => void;
   moveCar: (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE") => boolean;
   setUser: (user: User) => void;
   updateSettings: (settings: AppSettings) => void;
+  updateBranding: (appName: string, siteName: string) => void;
   updateLastChecked: (trackId: string) => void;
   addTrack: (trackName: string) => void;
   toggleTrackEnabled: (trackId: string) => void;
@@ -26,6 +29,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [settings, setSettings] = useState<AppSettings>({ requireUnconfirmDialog: false });
+  const [appName, setAppName] = useState<string>("Rail Yard Tracker");
+  const [siteName, setSiteName] = useState<string>("GFC Rail Yard");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -33,6 +38,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTracks(storage.getTracks());
     setCurrentUser(storage.getUser());
     setSettings(storage.getSettings());
+    setAppName(storage.getAppName());
+    setSiteName(storage.getSiteName());
   }, []);
 
   useEffect(() => {
@@ -198,6 +205,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storage.saveSettings(newSettings);
   };
 
+  const updateBranding = (newAppName: string, newSiteName: string) => {
+    setAppName(newAppName);
+    setSiteName(newSiteName);
+    storage.saveAppName(newAppName);
+    storage.saveSiteName(newSiteName);
+  };
+
   const setUser = (user: User) => {
     setCurrentUser(user);
     storage.saveUser(user);
@@ -266,12 +280,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tracks,
       currentUser,
       settings,
+      appName,
+      siteName,
       addCar,
       confirmCar,
       unconfirmCar,
       moveCar,
       setUser,
       updateSettings,
+      updateBranding,
       updateLastChecked,
       addTrack,
       toggleTrackEnabled,

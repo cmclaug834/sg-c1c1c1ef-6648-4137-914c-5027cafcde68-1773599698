@@ -4,6 +4,8 @@ const STORAGE_KEYS = {
   TRACKS: "rail_yard_tracks",
   USER: "rail_yard_user",
   SETTINGS: "rail_yard_settings",
+  APP_NAME: "rail_yard_app_name",
+  SITE_NAME: "rail_yard_site_name",
 };
 
 export const storage = {
@@ -50,6 +52,28 @@ export const storage = {
   saveSettings: (settings: AppSettings) => {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+  },
+
+  getAppName: (): string => {
+    if (typeof window === "undefined") return "Rail Yard Tracker";
+    const data = localStorage.getItem(STORAGE_KEYS.APP_NAME);
+    return data || "Rail Yard Tracker";
+  },
+
+  saveAppName: (name: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.APP_NAME, name);
+  },
+
+  getSiteName: (): string => {
+    if (typeof window === "undefined") return "GFC Rail Yard";
+    const data = localStorage.getItem(STORAGE_KEYS.SITE_NAME);
+    return data || "GFC Rail Yard";
+  },
+
+  saveSiteName: (name: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SITE_NAME, name);
   },
 };
 
