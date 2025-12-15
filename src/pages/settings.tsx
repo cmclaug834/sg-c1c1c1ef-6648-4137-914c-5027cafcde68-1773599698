@@ -6,10 +6,8 @@ import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnos
 import type { DebugLogEntry } from "@/lib/diagnostics";
 
 export default function Settings() {
-  const { currentUser, setUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks } = useApp();
+  const { currentUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks } = useApp();
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [crewId, setCrewId] = useState("");
   const [requireDialog, setRequireDialog] = useState(false);
   const [resolveOnDone, setResolveOnDone] = useState(true);
   const [showMissingInList, setShowMissingInList] = useState(false);
@@ -29,10 +27,6 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    if (mounted && currentUser) {
-      setName(currentUser.name);
-      setCrewId(currentUser.crewId);
-    }
     if (mounted) {
       setRequireDialog(settings.requireUnconfirmDialog);
       setResolveOnDone(settings.resolveOnDone ?? true);
@@ -41,19 +35,7 @@ export default function Settings() {
       setAdminManageTracks(settings.adminManageTracks ?? false);
       setLocalTracks(tracks);
     }
-  }, [mounted, currentUser, settings, tracks]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (name.trim() && crewId.trim()) {
-      setUser({
-        id: currentUser?.id || `user-${Date.now()}`,
-        name: name.trim(),
-        crewId: crewId.trim(),
-      });
-      router.push("/");
-    }
-  };
+  }, [mounted, settings, tracks]);
 
   const handleToggleDialog = () => {
     const newValue = !requireDialog;
@@ -138,7 +120,7 @@ export default function Settings() {
 
   const handleViewDebugLogs = () => {
     const logs = getDebugLogs();
-    setDebugLogs(logs.slice(-20).reverse()); // Show last 20, most recent first
+    setDebugLogs(logs.slice(-20).reverse());
     setShowDebugLogs(true);
   };
 
@@ -161,7 +143,7 @@ export default function Settings() {
         <div className="flex items-center justify-between mb-8">
           {currentUser && (
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/tracks")}
               className="p-3 hover:bg-zinc-800 rounded-lg transition-colors"
               aria-label="Back to track list"
             >
@@ -174,41 +156,6 @@ export default function Settings() {
           </h1>
           <div className="w-14" />
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="space-y-6">
-            <div>
-              <label className="block text-zinc-400 mb-2 text-lg">Your Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-zinc-800 text-white text-xl px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-zinc-400 mb-2 text-lg">Crew ID</label>
-              <input
-                type="text"
-                value={crewId}
-                onChange={(e) => setCrewId(e.target.value)}
-                className="w-full bg-zinc-800 text-white text-xl font-mono px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                placeholder="CREW-001"
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-4 bg-green-600 hover:bg-green-700 rounded-lg text-xl font-medium transition-colors"
-          >
-            Save Settings
-          </button>
-        </form>
 
         {/* D.sectionConfirmations */}
         <div id="D.sectionConfirmations" className="mt-12 pt-8 border-t border-zinc-800">
@@ -430,7 +377,7 @@ export default function Settings() {
           )}
         </div>
 
-        {/* NEW: Debug Section */}
+        {/* Diagnostics Section */}
         <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Diagnostics</h2>
 

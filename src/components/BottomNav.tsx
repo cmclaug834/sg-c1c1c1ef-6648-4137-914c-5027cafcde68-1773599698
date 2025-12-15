@@ -5,12 +5,12 @@ export function BottomNav() {
   const router = useRouter();
   const { pathname } = router;
 
-  const isYardCheckActive = pathname === "/" || pathname.startsWith("/track/");
+  const isYardCheckActive = pathname === "/tracks" || pathname.startsWith("/track/");
   const isReorderActive = pathname.startsWith("/reorder");
   const isSettingsActive = pathname.startsWith("/settings");
 
   const handleYardCheck = () => {
-    router.push("/");
+    router.push("/tracks");
   };
 
   const handleReorder = () => {

@@ -1,29 +1,65 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { CheckCircle2, Circle, Clock, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { profileStorage, CrewProfile } from "@/lib/profileStorage";
 
-export default function TrackSelect() {
-  const { tracks, currentUser, updateLastChecked } = useApp();
+export default function FrontPage() {
+  const { setUser } = useApp();
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showCrewEdit, setShowCrewEdit] = useState(false);
-  const [isOnline] = useState(true);
+  
+  const [name, setName] = useState("");
+  const [crewId, setCrewId] = useState("");
+  const [profiles, setProfiles] = useState<CrewProfile[]>([]);
+  const [showNameDropdown, setShowNameDropdown] = useState(false);
+  const [showCrewDropdown, setShowCrewDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const loadedProfiles = profileStorage.getProfiles();
+    setProfiles(loadedProfiles);
+    
+    // Pre-fill with most recent profile if available
+    const mostRecent = profileStorage.getMostRecent();
+    if (mostRecent) {
+      setName(mostRecent.name);
+      setCrewId(mostRecent.crewId);
+    }
   }, []);
 
-  useEffect(() => {
-    if (mounted && !currentUser) {
-      router.push("/settings");
-    }
-  }, [mounted, currentUser, router]);
-
-  if (!mounted || !currentUser) {
+  if (!mounted) {
     return null;
   }
+
+  const handleProfileSelect = (profile: CrewProfile) => {
+    setName(profile.name);
+    setCrewId(profile.crewId);
+    setShowNameDropdown(false);
+    setShowCrewDropdown(false);
+  };
+
+  const handleStartYardCheck = () => {
+    if (!name.trim() || !crewId.trim()) {
+      return;
+    }
+
+    // Save/update profile
+    profileStorage.upsertProfile(name.trim(), crewId.trim());
+
+    // Set user in context (same as Settings used to do)
+    setUser({
+      id: `user-${Date.now()}`,
+      name: name.trim(),
+      crewId: crewId.trim(),
+    });
+
+    // Navigate to track list
+    router.push("/tracks");
+  };
+
+  const mostRecent = profileStorage.getMostRecent();
+  const isValid = name.trim() && crewId.trim();
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -32,172 +68,143 @@ export default function TrackSelect() {
     day: "numeric",
   });
 
-  const filteredTracks = tracks.filter(track =>
-    track.enabled !== false && track.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleTrackClick = (trackId: string) => {
-    updateLastChecked(trackId);
-    router.push(`/track/${trackId}`);
-  };
-
-  const getTrackStatus = (track: typeof tracks[0]) => {
-    if (track.totalCars === 0) return "empty";
-    if (track.confirmedCars === track.totalCars) return "complete";
-    if (track.confirmedCars > 0) return "progress";
-    return "pending";
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "complete":
-        return <CheckCircle2 className="w-8 h-8 text-green-500" />;
-      case "progress":
-        return <Clock className="w-8 h-8 text-yellow-500" />;
-      default:
-        return <Circle className="w-8 h-8 text-zinc-600" />;
-    }
-  };
-
-  const formatLastChecked = (timestamp?: string) => {
-    if (!timestamp) return "Not checked";
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 60000);
-    
-    if (diff < 1) return "Just now";
-    if (diff < 60) return `${diff}m ago`;
-    const hours = Math.floor(diff / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return date.toLocaleDateString();
-  };
+  const uniqueNames = Array.from(new Set(profiles.map(p => p.name)));
+  const uniqueCrewIds = Array.from(new Set(profiles.map(p => p.crewId)));
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* A.headerTitle + A.headerDate */}
-        <div className="mb-6">
-          <h1 id="A.headerTitle" className="text-3xl md:text-4xl font-bold tracking-tight mb-1">
-            Morning Yard Check
+    <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
+      <div className="max-w-md w-full px-4 py-8">
+        {/* FRONT.headerTitle */}
+        <div className="text-center mb-8">
+          <h1 id="FRONT.headerTitle" className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+            GCF Rail Yard
           </h1>
-          <p id="A.headerDate" className="text-zinc-500 text-sm md:text-base">
+          
+          {/* FRONT.headerDate */}
+          <p id="FRONT.headerDate" className="text-zinc-500 text-base md:text-lg">
             {currentDate}
           </p>
         </div>
 
-        {/* A.crewBadge */}
-        <button
-          id="A.crewBadge"
-          onClick={() => setShowCrewEdit(true)}
-          className="mb-6 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-base md:text-lg font-medium transition-colors inline-flex items-center gap-2"
-        >
-          <span className="text-zinc-400">Crew:</span>
-          <span className="font-mono">{currentUser.crewId}</span>
-          <span className="text-xs text-zinc-500">✎</span>
-        </button>
+        {/* FRONT.crewProfileSection */}
+        <div id="FRONT.crewProfileSection" className="bg-zinc-800 rounded-2xl p-6 mb-6">
+          <h2 className="text-xl font-bold mb-6">Crew Profile</h2>
 
-        {/* A.searchTrack */}
-        <div id="A.searchTrack" className="mb-6 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search track…"
-            className="w-full bg-zinc-800 text-white pl-12 pr-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-zinc-600 focus:outline-none text-base md:text-lg"
-          />
-        </div>
+          {/* FRONT.nameField */}
+          <div id="FRONT.nameField" className="mb-6 relative">
+            <label className="block text-zinc-400 mb-2 text-base">Your Name</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onFocus={() => uniqueNames.length > 0 && setShowNameDropdown(true)}
+                className="w-full bg-zinc-900 text-white text-xl px-4 py-4 pr-12 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                placeholder="John Doe"
+              />
+              {uniqueNames.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowNameDropdown(!showNameDropdown)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              )}
+            </div>
 
-        {/* A.trackList */}
-        <div id="A.trackList" className="space-y-3 md:space-y-4">
-          {filteredTracks.map(track => {
-            const status = getTrackStatus(track);
+            {/* Name Dropdown */}
+            {showNameDropdown && uniqueNames.length > 0 && (
+              <div className="absolute z-50 w-full mt-2 bg-zinc-900 border-2 border-zinc-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                {uniqueNames.map((profileName, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const profile = profiles.find(p => p.name === profileName);
+                      if (profile) handleProfileSelect(profile);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-zinc-800 transition-colors text-base"
+                  >
+                    {profileName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-            return (
-              <button
-                key={track.id}
-                onClick={() => handleTrackClick(track.id)}
-                className="A.trackRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    {/* A.trackName */}
-                    <h2 className="A.trackName text-2xl md:text-3xl font-bold mb-2 truncate">
-                      {track.name}
-                    </h2>
-                    
-                    <div className="space-y-1">
-                      <div className="text-zinc-400 text-sm md:text-base">
-                        Cars: <span className="font-mono font-semibold text-white">
-                          {track.confirmedCars} / {track.totalCars}
-                        </span>
-                      </div>
-                      
-                      {/* A.lastChecked */}
-                      <div className="A.lastChecked text-zinc-500 text-xs md:text-sm">
-                        {formatLastChecked(track.lastChecked)}
-                      </div>
-                    </div>
-                  </div>
+          {/* FRONT.crewIdField */}
+          <div id="FRONT.crewIdField" className="mb-4 relative">
+            <label className="block text-zinc-400 mb-2 text-base">Crew ID</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={crewId}
+                onChange={(e) => setCrewId(e.target.value)}
+                onFocus={() => uniqueCrewIds.length > 0 && setShowCrewDropdown(true)}
+                className="w-full bg-zinc-900 text-white text-xl font-mono px-4 py-4 pr-12 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                placeholder="CREW-001"
+              />
+              {uniqueCrewIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowCrewDropdown(!showCrewDropdown)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              )}
+            </div>
 
-                  {/* A.trackStatus */}
-                  <div className="A.trackStatus flex-shrink-0">
-                    {getStatusIcon(status)}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+            {/* Crew ID Dropdown */}
+            {showCrewDropdown && uniqueCrewIds.length > 0 && (
+              <div className="absolute z-50 w-full mt-2 bg-zinc-900 border-2 border-zinc-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                {uniqueCrewIds.map((profileCrewId, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const profile = profiles.find(p => p.crewId === profileCrewId);
+                      if (profile) handleProfileSelect(profile);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-zinc-800 transition-colors text-base font-mono"
+                  >
+                    {profileCrewId}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* A.syncStatus */}
-        <div id="A.syncStatus" className="mt-8 text-center text-sm text-zinc-500">
-          Sync: {isOnline ? (
-            <span className="text-green-500">● Online</span>
-          ) : (
-            <span className="text-red-500">● Offline</span>
+          {/* FRONT.lastUsedText */}
+          {mostRecent && (
+            <p id="FRONT.lastUsedText" className="text-sm text-zinc-500">
+              Last used: {new Date(mostRecent.lastUsedAt).toLocaleString()}
+            </p>
           )}
         </div>
-      </div>
 
-      {/* Crew Edit Modal */}
-      {showCrewEdit && (
-        <CrewEditModal
-          currentUser={currentUser}
-          onClose={() => setShowCrewEdit(false)}
-        />
-      )}
-    </div>
-  );
-}
+        {/* FRONT.startBtn */}
+        <button
+          id="FRONT.startBtn"
+          onClick={handleStartYardCheck}
+          disabled={!isValid}
+          className={`w-full py-5 rounded-xl text-xl font-bold transition-colors flex items-center justify-center gap-3 ${
+            isValid
+              ? "bg-green-600 hover:bg-green-700"
+              : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+          }`}
+        >
+          Start Morning Yard Check
+          <ArrowRight className="w-6 h-6" />
+        </button>
 
-function CrewEditModal({ currentUser, onClose }: { currentUser: any; onClose: () => void }) {
-  const { setUser } = useApp();
-  const router = useRouter();
-
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
-        <h2 className="text-2xl font-bold mb-6">Edit Crew Info</h2>
-        
-        <div className="space-y-4">
-          <button
-            onClick={() => {
-              router.push("/settings");
-              onClose();
-            }}
-            className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-          >
-            Open Settings
-          </button>
-          
-          <button
-            onClick={onClose}
-            className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+        {/* FRONT.settingsLink */}
+        <button
+          id="FRONT.settingsLink"
+          onClick={() => router.push("/settings")}
+          className="w-full mt-4 py-3 text-zinc-400 hover:text-zinc-300 text-base transition-colors"
+        >
+          Go to Settings
+        </button>
       </div>
     </div>
   );
