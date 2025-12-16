@@ -3,11 +3,11 @@
  * ========================================
  * 
  * UPDATES:
- * - Added lastCheckClearedAt logic to clear check icons after Done
- * - Added multi-select mode with batch Move and Delete
- * - Added delete confirmation dialogs for both single and batch deletes
- * - Fixed handleRemoveCar to use saveTracks instead of reload
- * - Added separate "Shift Status" icon system with legend
+ * - Fixed BIG circle to be session-only (resets to grey after Done)
+ * - Fixed SMALL left icon to show persistent state (green stays after Done)
+ * - Fixed Progress to always compute from track.cars (no drift)
+ * - Kept selection mode checkbox independent
+ * - Kept all existing move/remove/import functionality
  */
 
 import { useApp } from "@/contexts/AppContext";
@@ -38,7 +38,7 @@ export default function TrackDetail() {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [commitToast, setCommitToast] = useState<string | null>(null);
 
-  // NEW: Multi-select mode
+  // Multi-select mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedCarIds, setSelectedCarIds] = useState<Set<string>>(new Set());
   const [showBatchMoveModal, setShowBatchMoveModal] = useState(false);
@@ -62,25 +62,14 @@ export default function TrackDetail() {
     );
   }
 
+  // Compute progress from track.cars directly (no drift)
+  const computedTotal = track.cars.length;
+  const computedConfirmed = track.cars.filter(c => c.status === "confirmed").length;
+
   // Check if there are pending changes
   const hasPendingChanges = pendingConfirmations.size > 0 || pendingUnconfirmations.size > 0;
 
-  // Get effective car status (including pending changes)
-  const getEffectiveStatus = (carId: string, currentStatus: string) => {
-    if (pendingConfirmations.has(carId)) return "confirmed";
-    if (pendingUnconfirmations.has(carId)) return "pending";
-    return currentStatus;
-  };
-
-  // NEW: Determine if check should be visually shown
-  const isVisuallyChecked = (car: any) => {
-    if (car.status !== "confirmed") return false;
-    if (!track.lastCheckClearedAt) return true;
-    if (!car.confirmedAt) return false;
-    return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
-  };
-
-  // NEW: Determine if car was checked this shift
+  // Determine if car was checked this shift (for filtering)
   const isCheckedThisShift = (car: any) => {
     if (car.status !== "confirmed") return false;
     if (!car.confirmedAt) return false;
@@ -88,8 +77,8 @@ export default function TrackDetail() {
     return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
   };
 
-  // NEW: Get shift status icon (small indicator - LEFT side)
-  const getShiftStatusIcon = (car: any) => {
+  // SMALL left status icon - PERSISTENT STATE (uses car.status)
+  const getSmallStatusIcon = (car: any) => {
     if (car.status === "missing") {
       return <AlertTriangle className="w-6 h-6 md:w-7 md:h-7 text-yellow-500" />;
     }
@@ -112,19 +101,15 @@ export default function TrackDetail() {
       return;
     }
 
-    const effectiveStatus = getEffectiveStatus(carId, currentStatus);
+    // Determine current effective status
+    const isPendingConfirm = pendingConfirmations.has(carId);
+    const isPendingUnconfirm = pendingUnconfirmations.has(carId);
+    const isConfirmed = currentStatus === "confirmed";
 
-    // Log diagnostic before toggle
-    if (track) {
-      logDiagnostic(
-        "TOGGLE_CONFIRM_BEFORE",
-        track,
-        pendingConfirmations.size,
-        pendingUnconfirmations.size
-      );
-    }
+    // Effective status considering pending changes
+    const effectivelyConfirmed = (isConfirmed && !isPendingUnconfirm) || isPendingConfirm;
 
-    if (effectiveStatus === "confirmed") {
+    if (effectivelyConfirmed) {
       // Handle unconfirm
       if (settings.requireUnconfirmDialog) {
         setUnconfirmDialogCar({ trackId: track.id, carId, carNumber });
@@ -137,24 +122,13 @@ export default function TrackDetail() {
         });
       }
     } else {
+      // Handle confirm
       setPendingConfirmations(prev => new Set(prev).add(carId));
       setPendingUnconfirmations(prev => {
         const next = new Set(prev);
         next.delete(carId);
         return next;
       });
-    }
-
-    // Log diagnostic after toggle
-    if (track) {
-      setTimeout(() => {
-        logDiagnostic(
-          "TOGGLE_CONFIRM_AFTER",
-          track,
-          pendingConfirmations.size,
-          pendingUnconfirmations.size
-        );
-      }, 100);
     }
   };
 
@@ -170,13 +144,13 @@ export default function TrackDetail() {
     }
   };
 
-  // NEW: Toggle selection mode
+  // Toggle selection mode
   const handleToggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
     setSelectedCarIds(new Set());
   };
 
-  // NEW: Toggle individual car selection
+  // Toggle individual car selection
   const handleToggleSelection = (carId: string) => {
     setSelectedCarIds(prev => {
       const next = new Set(prev);
@@ -189,7 +163,7 @@ export default function TrackDetail() {
     });
   };
 
-  // NEW: Batch move selected cars
+  // Batch move selected cars
   const handleBatchMove = (targetTrackId: string, targetTrackName: string) => {
     let movedCount = 0;
     let skippedCount = 0;
@@ -216,7 +190,7 @@ export default function TrackDetail() {
     setTimeout(() => setMoveToast(null), 3000);
   };
 
-  // NEW: Batch delete selected cars
+  // Batch delete selected cars
   const handleBatchDeleteConfirmed = () => {
     if (!currentUser) return;
 
@@ -246,8 +220,6 @@ export default function TrackDetail() {
         return {
           ...t,
           cars: updatedCars,
-          totalCars: updatedCars.length,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
       }
       return t;
@@ -299,8 +271,6 @@ export default function TrackDetail() {
         return {
           ...t,
           cars: updatedCars,
-          totalCars: updatedCars.length,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
       }
       return t;
@@ -353,7 +323,7 @@ export default function TrackDetail() {
     router.push("/tracks");
   };
 
-  // NEW: Commit all pending changes and clear check icons
+  // Commit all pending changes and clear pending sets
   const handleYardCheckCompleted = () => {
     if (!track) return;
 
@@ -391,7 +361,7 @@ export default function TrackDetail() {
     // Update last checked timestamp
     updateLastChecked(track.id);
     
-    // NEW: Clear check icons by setting lastCheckClearedAt
+    // Update lastCheckClearedAt
     updateTrackTimestamp(track.id, "lastCheckClearedAt");
 
     logDiagnostic(
@@ -401,7 +371,7 @@ export default function TrackDetail() {
       0
     );
 
-    // Clear pending changes (this resets large circles to grey)
+    // Clear pending changes (this resets BIG circles to grey)
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
 
@@ -421,7 +391,7 @@ export default function TrackDetail() {
     }, 1500);
   };
 
-  // UPDATED: Filter logic for "Unconfirmed only" toggle
+  // Filter logic for "Unconfirmed only" toggle
   const filteredCars = showUnconfirmedOnly 
     ? track.cars.filter(car => !isCheckedThisShift(car))
     : track.cars;
@@ -474,7 +444,7 @@ export default function TrackDetail() {
             <div className="flex justify-between items-center text-lg md:text-xl">
               <span className="text-zinc-400">Progress:</span>
               <span className="font-mono font-bold text-2xl md:text-3xl">
-                {track.confirmedCars + pendingConfirmations.size - pendingUnconfirmations.size} / {track.totalCars}
+                {computedConfirmed + pendingConfirmations.size - pendingUnconfirmations.size} / {computedTotal}
               </span>
             </div>
             {hasPendingChanges && (
@@ -484,7 +454,7 @@ export default function TrackDetail() {
             )}
           </div>
 
-          {/* NEW: Shift Status Legend */}
+          {/* Shift Status Legend */}
           <div className="bg-zinc-800/50 p-3 rounded-lg mb-4">
             <div className="flex items-center justify-around text-xs md:text-sm">
               <div className="flex items-center gap-2">
@@ -524,7 +494,7 @@ export default function TrackDetail() {
               </div>
             </button>
 
-            {/* NEW: Select Mode Toggle */}
+            {/* Select Mode Toggle */}
             <button
               id="B.selectModeToggle"
               onClick={handleToggleSelectionMode}
@@ -540,7 +510,7 @@ export default function TrackDetail() {
         </div>
       </div>
 
-      {/* B.carList */}
+      {/* Car List */}
       <div id="B.carList" className="flex-1 overflow-y-auto pb-[calc(96px+env(safe-area-inset-bottom))]">
         <div className="max-w-4xl mx-auto px-4 py-4">
           {filteredCars.length === 0 ? (
@@ -555,9 +525,9 @@ export default function TrackDetail() {
           ) : (
             <div className="space-y-3">
               {filteredCars.map(car => {
-                const effectiveStatus = getEffectiveStatus(car.id, car.status);
-                const isPending = pendingConfirmations.has(car.id) || pendingUnconfirmations.has(car.id);
                 const isSelected = selectedCarIds.has(car.id);
+                const isPendingConfirm = pendingConfirmations.has(car.id);
+                const isPendingUnconfirm = pendingUnconfirmations.has(car.id);
 
                 return (
                   <div
@@ -573,13 +543,13 @@ export default function TrackDetail() {
                         className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-4">
-                          {/* Small Status Icon (LEFT) - Shows persistent stored state */}
+                          {/* SMALL left status icon - PERSISTENT STATE (uses car.status) */}
                           <div className="flex-shrink-0">
-                            {getShiftStatusIcon(car)}
+                            {getSmallStatusIcon(car)}
                           </div>
 
-                          {/* Selection checkbox or Large Confirm Circle (MIDDLE) */}
-                          {selectionMode && (
+                          {/* Selection checkbox or BIG confirm circle */}
+                          {selectionMode ? (
                             <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
                               isSelected
                                 ? "bg-blue-600 border-blue-600"
@@ -591,19 +561,15 @@ export default function TrackDetail() {
                                 </svg>
                               )}
                             </div>
-                          )}
-
-                          {/* Large Confirm Circle (MIDDLE) - Shows temporary session state */}
-                          {!selectionMode && (
+                          ) : (
+                            /* BIG confirm circle - SESSION ONLY (uses pending state only) */
                             <div className="B.confirmStateIcon flex-shrink-0">
                               {car.status === "missing" ? (
                                 <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
-                              ) : pendingConfirmations.has(car.id) ? (
+                              ) : isPendingConfirm ? (
                                 <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
-                              ) : pendingUnconfirmations.has(car.id) ? (
+                              ) : isPendingUnconfirm ? (
                                 <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
-                              ) : effectiveStatus === "confirmed" ? (
-                                <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
                               ) : (
                                 <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
                               )}
@@ -619,13 +585,13 @@ export default function TrackDetail() {
                               {car.carType}
                             </div>
 
-                            {isPending && (
+                            {(isPendingConfirm || isPendingUnconfirm) && (
                               <div className="text-yellow-500 text-sm md:text-base">
-                                Pending: {pendingConfirmations.has(car.id) ? "will confirm" : "will unconfirm"}
+                                Pending: {isPendingConfirm ? "will confirm" : "will unconfirm"}
                               </div>
                             )}
 
-                            {!isPending && car.status === "confirmed" && car.confirmedAt && (
+                            {!isPendingConfirm && !isPendingUnconfirm && car.status === "confirmed" && car.confirmedAt && (
                               <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
                                 Confirmed {formatConfirmedTime(car.confirmedAt)}
                                 {car.confirmedBy && ` by ${car.confirmedBy}`}
@@ -641,7 +607,7 @@ export default function TrackDetail() {
                         </div>
                       </button>
 
-                      {/* B.rowMenuBtn - Hide in selection mode */}
+                      {/* Row menu - Hide in selection mode */}
                       {!selectionMode && (
                         <button
                           id="B.rowMenuBtn"
@@ -665,7 +631,7 @@ export default function TrackDetail() {
       <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-[9999] pointer-events-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="max-w-4xl mx-auto p-4">
           {selectionMode && selectedCarIds.size > 0 ? (
-            // NEW: Batch action buttons when items selected
+            // Batch action buttons when items selected
             <div className="grid grid-cols-3 gap-3">
               <button
                 id="B.cancelSelectionBtn"
@@ -823,7 +789,7 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* NEW: Batch Move Modal */}
+      {/* Batch Move Modal */}
       {showBatchMoveModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
@@ -854,7 +820,7 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* NEW: Batch Delete Confirmation Dialog */}
+      {/* Batch Delete Confirmation Dialog */}
       {showBatchDeleteConfirm && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
@@ -889,7 +855,7 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* B.removeConfirmDialog - Single car delete confirmation */}
+      {/* Remove Car Confirmation Dialog */}
       {removeConfirmCar && (
         <div id="B.removeConfirmDialog" className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
@@ -968,7 +934,7 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* B.moveConfirmToast */}
+      {/* Move Toast */}
       {moveToast && (
         <div id="B.moveConfirmToast" className="fixed top-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-zinc-700">
           <p className="text-base md:text-lg font-medium">{moveToast}</p>
@@ -1045,8 +1011,6 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
         return {
           ...track,
           cars: updatedCars,
-          totalCars: updatedCars.length,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
       }
       return track;
@@ -1148,7 +1112,7 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
         </div>
       </div>
 
-      {/* Dialog Y: Duplicate Car Warning */}
+      {/* Duplicate Car Warning Dialog */}
       {duplicateInfo && (
         <DuplicateCarDialog
           carNumber={normalizedPreview}
