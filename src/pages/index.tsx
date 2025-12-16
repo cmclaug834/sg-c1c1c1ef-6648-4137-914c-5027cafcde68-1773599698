@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { profileStorage, CrewProfile } from "@/lib/profileStorage";
 import { storage } from "@/lib/storage";
+import { User } from "@/types";
 
 /**
  * Compute next shift change timestamp
