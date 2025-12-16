@@ -21,113 +21,206 @@ export interface ActiveCrew {
 export const storage = {
   getTracks: (): Track[] => {
     if (typeof window === "undefined") return [];
-    const data = localStorage.getItem(STORAGE_KEYS.TRACKS);
-    return data ? JSON.parse(data) : getInitialTracks();
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.TRACKS);
+      if (!data) return getInitialTracks();
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : getInitialTracks();
+    } catch (error) {
+      console.warn("[Storage] Failed to parse tracks, returning defaults:", error);
+      return getInitialTracks();
+    }
   },
 
   saveTracks: (tracks: Track[]) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(tracks));
+    try {
+      localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(tracks));
+    } catch (error) {
+      console.error("[Storage] Failed to save tracks:", error);
+    }
   },
 
   getUser: (): User | null => {
     if (typeof window === "undefined") return null;
-    const data = localStorage.getItem(STORAGE_KEYS.USER);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USER);
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch (error) {
+      console.warn("[Storage] Failed to parse user, returning null:", error);
+      return null;
+    }
   },
 
   saveUser: (user: User) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    try {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    } catch (error) {
+      console.error("[Storage] Failed to save user:", error);
+    }
   },
 
   getSettings: (): AppSettings => {
-    if (typeof window === "undefined") return { 
-      requireUnconfirmDialog: false,
-      resolveOnDone: true,
-      showMissingInList: false,
-      movePlacement: "append",
-      adminManageTracks: false,
-      shiftChangeA: "06:00",
-      shiftChangeB: "18:00",
-    };
-    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? JSON.parse(data) : { 
-      requireUnconfirmDialog: false,
-      resolveOnDone: true,
-      showMissingInList: false,
-      movePlacement: "append",
-      adminManageTracks: false,
-      shiftChangeA: "06:00",
-      shiftChangeB: "18:00",
-    };
+    if (typeof window === "undefined") {
+      return {
+        requireUnconfirmDialog: false,
+        resolveOnDone: true,
+        showMissingInList: false,
+        movePlacement: "append",
+        adminManageTracks: false,
+        shiftChangeA: "06:00",
+        shiftChangeB: "18:00",
+      };
+    }
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (!data) {
+        return {
+          requireUnconfirmDialog: false,
+          resolveOnDone: true,
+          showMissingInList: false,
+          movePlacement: "append",
+          adminManageTracks: false,
+          shiftChangeA: "06:00",
+          shiftChangeB: "18:00",
+        };
+      }
+      return JSON.parse(data);
+    } catch (error) {
+      console.warn("[Storage] Failed to parse settings, returning defaults:", error);
+      return {
+        requireUnconfirmDialog: false,
+        resolveOnDone: true,
+        showMissingInList: false,
+        movePlacement: "append",
+        adminManageTracks: false,
+        shiftChangeA: "06:00",
+        shiftChangeB: "18:00",
+      };
+    }
   },
 
   saveSettings: (settings: AppSettings) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (error) {
+      console.error("[Storage] Failed to save settings:", error);
+    }
   },
 
   getAppName: (): string => {
     if (typeof window === "undefined") return "Rail Yard Tracker";
-    const data = localStorage.getItem(STORAGE_KEYS.APP_NAME);
-    return data || "Rail Yard Tracker";
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.APP_NAME);
+      return data || "Rail Yard Tracker";
+    } catch (error) {
+      console.warn("[Storage] Failed to get app name:", error);
+      return "Rail Yard Tracker";
+    }
   },
 
   saveAppName: (name: string) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.APP_NAME, name);
+    try {
+      localStorage.setItem(STORAGE_KEYS.APP_NAME, name);
+    } catch (error) {
+      console.error("[Storage] Failed to save app name:", error);
+    }
   },
 
   getSiteName: (): string => {
     if (typeof window === "undefined") return "GFC Rail Yard";
-    const data = localStorage.getItem(STORAGE_KEYS.SITE_NAME);
-    return data || "GFC Rail Yard";
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.SITE_NAME);
+      return data || "GFC Rail Yard";
+    } catch (error) {
+      console.warn("[Storage] Failed to get site name:", error);
+      return "GFC Rail Yard";
+    }
   },
 
   saveSiteName: (name: string) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.SITE_NAME, name);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SITE_NAME, name);
+    } catch (error) {
+      console.error("[Storage] Failed to save site name:", error);
+    }
   },
 
   getActiveCrew: (): ActiveCrew | null => {
     if (typeof window === "undefined") return null;
-    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_CREW);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_CREW);
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch (error) {
+      console.warn("[Storage] Failed to parse active crew:", error);
+      return null;
+    }
   },
 
   saveActiveCrew: (crew: ActiveCrew) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_CREW, JSON.stringify(crew));
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_CREW, JSON.stringify(crew));
+    } catch (error) {
+      console.error("[Storage] Failed to save active crew:", error);
+    }
   },
 
   clearActiveCrew: () => {
     if (typeof window === "undefined") return;
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_CREW);
-    localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_CREW);
+      localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
+    } catch (error) {
+      console.error("[Storage] Failed to clear active crew:", error);
+    }
   },
 
   getSessionExpiresAt: (): string | null => {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
+    try {
+      return localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
+    } catch (error) {
+      console.warn("[Storage] Failed to get session expires at:", error);
+      return null;
+    }
   },
 
   saveSessionExpiresAt: (timestamp: string) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.SESSION_EXPIRES_AT, timestamp);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SESSION_EXPIRES_AT, timestamp);
+    } catch (error) {
+      console.error("[Storage] Failed to save session expires at:", error);
+    }
   },
 
   getShiftTimes: (): { shiftA: string; shiftB: string } => {
     if (typeof window === "undefined") return { shiftA: "06:00", shiftB: "18:00" };
-    const shiftA = localStorage.getItem(STORAGE_KEYS.SHIFT_A) || "06:00";
-    const shiftB = localStorage.getItem(STORAGE_KEYS.SHIFT_B) || "18:00";
-    return { shiftA, shiftB };
+    try {
+      const shiftA = localStorage.getItem(STORAGE_KEYS.SHIFT_A) || "06:00";
+      const shiftB = localStorage.getItem(STORAGE_KEYS.SHIFT_B) || "18:00";
+      return { shiftA, shiftB };
+    } catch (error) {
+      console.warn("[Storage] Failed to get shift times:", error);
+      return { shiftA: "06:00", shiftB: "18:00" };
+    }
   },
 
   saveShiftTimes: (shiftA: string, shiftB: string) => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.SHIFT_A, shiftA);
-    localStorage.setItem(STORAGE_KEYS.SHIFT_B, shiftB);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SHIFT_A, shiftA);
+      localStorage.setItem(STORAGE_KEYS.SHIFT_B, shiftB);
+    } catch (error) {
+      console.error("[Storage] Failed to save shift times:", error);
+    }
   },
 };
 
@@ -137,8 +230,6 @@ function getInitialTracks(): Track[] {
       id: "track-1",
       name: "AS28",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -146,8 +237,6 @@ function getInitialTracks(): Track[] {
       id: "track-2",
       name: "AS29",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -155,8 +244,6 @@ function getInitialTracks(): Track[] {
       id: "track-3",
       name: "AS30",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -164,8 +251,6 @@ function getInitialTracks(): Track[] {
       id: "track-4",
       name: "AS31",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -173,8 +258,6 @@ function getInitialTracks(): Track[] {
       id: "track-5",
       name: "AS32",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -182,8 +265,6 @@ function getInitialTracks(): Track[] {
       id: "track-6",
       name: "AS33",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -191,8 +272,6 @@ function getInitialTracks(): Track[] {
       id: "track-7",
       name: "AS34",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -200,8 +279,6 @@ function getInitialTracks(): Track[] {
       id: "track-8",
       name: "AS38",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -209,8 +286,6 @@ function getInitialTracks(): Track[] {
       id: "track-9",
       name: "AS39",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -218,8 +293,6 @@ function getInitialTracks(): Track[] {
       id: "track-10",
       name: "AS46",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -227,8 +300,6 @@ function getInitialTracks(): Track[] {
       id: "track-11",
       name: "AS47",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },
@@ -236,8 +307,6 @@ function getInitialTracks(): Track[] {
       id: "track-12",
       name: "AS48",
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       lastChecked: undefined,
       enabled: true,
     },

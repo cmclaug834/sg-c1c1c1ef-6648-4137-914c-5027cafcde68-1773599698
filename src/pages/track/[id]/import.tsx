@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { useState, useRef } from "react";
 import { extractCarIds, computeImportBuckets } from "@/lib/carImportParser";
+import { normalizeCarId } from "@/lib/carIdFormatter";
 import type { ExtractedCar } from "@/lib/carImportParser";
 
 interface PreviewData {
@@ -36,19 +37,15 @@ export default function ImportCars() {
   }
 
   const handlePreview = () => {
-    // Extract car IDs from paste text
     const { recognized, unrecognized } = extractCarIds(pasteText);
 
-    // Get existing car numbers from current track
-    const existingToday = track?.cars.map(car => car.carNumber) || [];
+    // Normalize existing car numbers for comparison
+    const existingToday = track?.cars.map(car => normalizeCarId(car.carNumber)) || [];
 
-    // TODO: Load existing snapshot when snapshot feature is implemented
     const existingSnapshot: string[] = [];
 
-    // Compute buckets
     const buckets = computeImportBuckets(recognized, existingToday, existingSnapshot);
 
-    // Map buckets.toAdd back to ExtractedCar format with source info
     const toAddWithSource = recognized.filter(car => 
       buckets.toAdd.includes(car.normalized)
     );
@@ -59,7 +56,6 @@ export default function ImportCars() {
       unrecognized,
     });
 
-    // Auto-scroll to preview results after state update
     setTimeout(() => {
       willAddSectionRef.current?.scrollIntoView({ 
         behavior: "smooth", 
@@ -98,6 +94,28 @@ export default function ImportCars() {
 
   const handleBackToEdit = () => {
     setPreview(null);
+  };
+
+  const executeImport = (carsToAdd: string[]) => {
+    carsToAdd.forEach(carNumber => {
+      // Normalize before adding (defense in depth)
+      const normalized = normalizeCarId(carNumber);
+      addCar(track!.id, {
+        carNumber: normalized,
+        carType: "BOX",
+      });
+    });
+
+    const skippedCount = preview!.skipped.length - selectedDuplicates.size;
+    const message = skippedCount > 0 
+      ? `Added ${carsToAdd.length} cars. Skipped ${skippedCount} duplicates.`
+      : `Added ${carsToAdd.length} cars.`;
+    
+    setImportToast(message);
+
+    setTimeout(() => {
+      router.push(`/track/${id}`);
+    }, 2000);
   };
 
   return (

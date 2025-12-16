@@ -4,13 +4,7 @@ export interface TrackDiagnostic {
   trackId: string;
   trackName: string;
   carsLength: number;
-  storedTotalCars: number;
-  storedConfirmedCars: number;
   computedConfirmedCars: number;
-  mismatchFlags: {
-    totalMismatch: boolean;
-    confirmedMismatch: boolean;
-  };
 }
 
 export interface DebugLogEntry {
@@ -23,26 +17,18 @@ export interface DebugLogEntry {
 
 /**
  * Diagnose track data integrity
- * Checks if stored counts match actual array lengths/statuses
+ * With dynamic counts, there's no drift to detect
+ * This logs the current state for debugging
  */
-export function diagnoseTrackIntegrity(track: Track): TrackDiagnostic {
+export function diagnoseTrackIntegrity(track: Track & { totalCars?: number; confirmedCars?: number }): TrackDiagnostic {
   const carsLength = track.cars.length;
   const computedConfirmedCars = track.cars.filter(c => c.status === "confirmed").length;
-  
-  const totalMismatch = track.totalCars !== carsLength;
-  const confirmedMismatch = track.confirmedCars !== computedConfirmedCars;
 
   return {
     trackId: track.id,
     trackName: track.name,
     carsLength,
-    storedTotalCars: track.totalCars,
-    storedConfirmedCars: track.confirmedCars,
     computedConfirmedCars,
-    mismatchFlags: {
-      totalMismatch,
-      confirmedMismatch,
-    },
   };
 }
 
@@ -51,7 +37,7 @@ export function diagnoseTrackIntegrity(track: Track): TrackDiagnostic {
  */
 export function logDiagnostic(
   action: string,
-  track: Track,
+  track: Track & { totalCars?: number; confirmedCars?: number },
   pendingConfirmations: number = 0,
   pendingUnconfirmations: number = 0
 ): void {
@@ -65,20 +51,12 @@ export function logDiagnostic(
     pendingUnconfirmations,
   };
 
-  // Log to console
-  console.log(`[DIAGNOSTIC] ${action}`, {
-    ...entry,
-    mismatches: diagnostic.mismatchFlags.totalMismatch || diagnostic.mismatchFlags.confirmedMismatch
-      ? "⚠️ MISMATCH DETECTED"
-      : "✓ OK",
-  });
+  console.log(`[DIAGNOSTIC] ${action}`, entry);
 
-  // Persist to localStorage
   try {
     const existingLogs = JSON.parse(localStorage.getItem("rail_yard_debug_logs") || "[]");
     const updatedLogs = [...existingLogs, entry];
     
-    // Keep only last 100 entries to prevent storage bloat
     const trimmedLogs = updatedLogs.slice(-100);
     
     localStorage.setItem("rail_yard_debug_logs", JSON.stringify(trimmedLogs));
@@ -92,7 +70,9 @@ export function logDiagnostic(
  */
 export function getDebugLogs(): DebugLogEntry[] {
   try {
-    return JSON.parse(localStorage.getItem("rail_yard_debug_logs") || "[]");
+    const data = localStorage.getItem("rail_yard_debug_logs");
+    if (!data) return [];
+    return JSON.parse(data);
   } catch (error) {
     console.error("[DIAGNOSTIC] Failed to read logs:", error);
     return [];

@@ -22,8 +22,6 @@ export interface Track {
   id: string;
   name: string;
   cars: RailCar[];
-  totalCars: number;
-  confirmedCars: number;
   lastChecked?: string;
   lastCheckClearedAt?: string;
   enabled?: boolean;

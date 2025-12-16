@@ -579,16 +579,12 @@ export default function Settings() {
               ) : (
                 debugLogs.map((log, idx) => {
                   const { diagnostic } = log;
-                  const hasMismatch = diagnostic.mismatchFlags.totalMismatch || diagnostic.mismatchFlags.confirmedMismatch;
 
                   return (
                     <div
                       key={idx}
-                      className={`bg-zinc-800 p-4 rounded-lg border-2 ${
-                        hasMismatch ? "border-red-500" : "border-zinc-700"
-                      }`}
+                      className="bg-zinc-800 p-4 rounded-lg border-2 border-zinc-700"
                     >
-                      {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="text-lg font-bold text-green-400 mb-1">
@@ -598,39 +594,24 @@ export default function Settings() {
                             {new Date(log.timestamp).toLocaleString()}
                           </div>
                         </div>
-                        {hasMismatch && (
-                          <div className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold">
-                            ⚠️ MISMATCH
-                          </div>
-                        )}
                       </div>
 
-                      {/* Track Info */}
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-zinc-400">Track:</span>
                           <span className="font-mono font-semibold">{diagnostic.trackName}</span>
                         </div>
 
-                        {/* Total Cars */}
-                        <div className={`flex justify-between ${diagnostic.mismatchFlags.totalMismatch ? "text-red-400" : ""}`}>
+                        <div className="flex justify-between">
                           <span className="text-zinc-400">Total Cars:</span>
-                          <span className="font-mono">
-                            stored: {diagnostic.storedTotalCars} | actual: {diagnostic.carsLength}
-                            {diagnostic.mismatchFlags.totalMismatch && " ⚠️"}
-                          </span>
+                          <span className="font-mono">{diagnostic.carsLength}</span>
                         </div>
 
-                        {/* Confirmed Cars */}
-                        <div className={`flex justify-between ${diagnostic.mismatchFlags.confirmedMismatch ? "text-red-400" : ""}`}>
+                        <div className="flex justify-between">
                           <span className="text-zinc-400">Confirmed:</span>
-                          <span className="font-mono">
-                            stored: {diagnostic.storedConfirmedCars} | actual: {diagnostic.computedConfirmedCars}
-                            {diagnostic.mismatchFlags.confirmedMismatch && " ⚠️"}
-                          </span>
+                          <span className="font-mono">{diagnostic.computedConfirmedCars}</span>
                         </div>
 
-                        {/* Pending Changes */}
                         {(log.pendingConfirmations > 0 || log.pendingUnconfirmations > 0) && (
                           <div className="flex justify-between text-yellow-400">
                             <span>Pending:</span>

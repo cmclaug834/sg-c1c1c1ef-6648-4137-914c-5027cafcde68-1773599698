@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { Track, User, RailCar, AppSettings, MoveLog } from "@/types";
 import { storage } from "@/lib/storage";
 import { logDiagnostic } from "@/lib/diagnostics";
+import { normalizeCarId } from "@/lib/carIdFormatter";
 
 /**
  * Generate a unique car ID
@@ -11,20 +12,25 @@ function generateUniqueCarId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return `car-${crypto.randomUUID()}`;
   }
-  // Fallback: Date.now() + random suffix to avoid collisions
   return `car-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
 /**
  * Repair track data: ensure all cars have unique IDs
+ * Also reconciles totalCars and confirmedCars from legacy data
  * Returns repaired tracks and logs any fixes made
  */
 function repairTrackData(tracks: Track[]): Track[] {
   let repairCount = 0;
+  let countMismatches = 0;
   const usedIds = new Set<string>();
 
   const repairedTracks = tracks.map(track => {
     const repairedCars = track.cars.map(car => {
+      // Normalize car number on load if not already normalized
+      const normalized = normalizeCarId(car.carNumber);
+      const needsNormalization = car.carNumber !== normalized;
+
       // Check if car is missing ID or has duplicate ID
       if (!car.id || usedIds.has(car.id)) {
         const oldId = car.id || "(missing)";
@@ -32,27 +38,72 @@ function repairTrackData(tracks: Track[]): Track[] {
         repairCount++;
         console.warn(`[DATA REPAIR] Track ${track.name}: Fixed car ${car.carNumber} - ID ${oldId} → ${newId}`);
         usedIds.add(newId);
-        return { ...car, id: newId };
+        return {
+          ...car,
+          id: newId,
+          carNumber: normalized,
+        };
       }
+
       usedIds.add(car.id);
-      return car;
+      return needsNormalization ? { ...car, carNumber: normalized } : car;
     });
 
-    return {
-      ...track,
+    // Remove legacy totalCars and confirmedCars if present
+    // These will be computed dynamically going forward
+    const cleanedTrack: Track = {
+      id: track.id,
+      name: track.name,
       cars: repairedCars,
+      lastChecked: track.lastChecked,
+      lastCheckClearedAt: track.lastCheckClearedAt,
+      enabled: track.enabled,
     };
+
+    // Check if legacy counts existed and were wrong
+    const legacyTrack = track as any;
+    if (legacyTrack.totalCars !== undefined || legacyTrack.confirmedCars !== undefined) {
+      const actualTotal = repairedCars.length;
+      const actualConfirmed = repairedCars.filter(c => c.status === "confirmed").length;
+      if (legacyTrack.totalCars !== actualTotal || legacyTrack.confirmedCars !== actualConfirmed) {
+        countMismatches++;
+      }
+    }
+
+    return cleanedTrack;
   });
 
   if (repairCount > 0) {
     console.warn(`[DATA REPAIR] Fixed ${repairCount} cars with missing/duplicate IDs`);
   }
+  if (countMismatches > 0) {
+    console.warn(`[DATA REPAIR] Removed legacy count fields from ${countMismatches} tracks (now computed dynamically)`);
+  }
 
   return repairedTracks;
 }
 
+/**
+ * Compute dynamic track counts from cars array
+ * This is the single source of truth for counts
+ */
+function computeTrackCounts(cars: RailCar[]): { totalCars: number; confirmedCars: number } {
+  return {
+    totalCars: cars.length,
+    confirmedCars: cars.filter(c => c.status === "confirmed").length,
+  };
+}
+
+/**
+ * Enhance track with computed counts for display
+ */
+export interface TrackWithCounts extends Track {
+  totalCars: number;
+  confirmedCars: number;
+}
+
 interface AppContextType {
-  tracks: Track[];
+  tracks: TrackWithCounts[];
   currentUser: User | null;
   settings: AppSettings;
   appName: string;
@@ -99,18 +150,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [tracks, mounted]);
 
+  // Enhance tracks with computed counts for consumer components
+  const tracksWithCounts: TrackWithCounts[] = tracks.map(track => ({
+    ...track,
+    ...computeTrackCounts(track.cars),
+  }));
+
   const addCar = (trackId: string, car: Omit<RailCar, "id" | "status">) => {
     setTracks(prev => prev.map(track => {
       if (track.id === trackId) {
+        // Normalize car number at entry point
+        const normalizedCarNumber = normalizeCarId(car.carNumber);
+        
         const newCar: RailCar = {
           ...car,
+          carNumber: normalizedCarNumber,
           id: generateUniqueCarId(),
           status: "pending",
         };
+        
         return {
           ...track,
           cars: [...track.cars, newCar],
-          totalCars: track.totalCars + 1,
         };
       }
       return track;
@@ -132,14 +193,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
               }
             : car
         );
+        
         const updatedTrack = {
           ...track,
           cars: updatedCars,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
 
         // Log diagnostic after confirm
-        logDiagnostic("CONFIRM_CAR", updatedTrack);
+        logDiagnostic("CONFIRM_CAR", { ...updatedTrack, ...computeTrackCounts(updatedCars) } as any);
 
         return updatedTrack;
       }
@@ -160,14 +221,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
               }
             : car
         );
+        
         const updatedTrack = {
           ...track,
           cars: updatedCars,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
         };
 
         // Log diagnostic after unconfirm
-        logDiagnostic("UNCONFIRM_CAR", updatedTrack);
+        logDiagnostic("UNCONFIRM_CAR", { ...updatedTrack, ...computeTrackCounts(updatedCars) } as any);
 
         return updatedTrack;
       }
@@ -175,72 +236,96 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  /**
+   * moveCar - Fixed to eliminate stale state reads
+   * All track lookups now happen inside setTracks callback
+   */
   const moveCar = (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE"): boolean => {
     if (!currentUser) return false;
 
-    // Find source track and car
-    const fromTrack = tracks.find(t => t.id === fromTrackId);
-    const car = fromTrack?.cars.find(c => c.id === carId);
-    
-    if (!fromTrack || !car) return false;
+    let success = false;
 
-    // Validate destination track exists
-    const toTrack = tracks.find(t => t.id === toTrackId);
-    if (!toTrack) return false;
-
-    // Check for duplicates in destination track
-    const duplicateExists = toTrack.cars.some(c => c.carNumber === car.carNumber);
-    if (duplicateExists) return false;
-
-    // Create move log entry
-    const moveLog: MoveLog = {
-      id: `move-${Date.now()}`,
-      carId: car.id,
-      carNumber: car.carNumber,
-      fromTrack: fromTrack.name,
-      toTrack: toTrack.name,
-      timestamp: new Date().toISOString(),
-      crewId: currentUser.crewId,
-      reason,
-    };
-
-    // Store move log (localStorage for now)
-    const existingLogs = JSON.parse(localStorage.getItem("rail_yard_move_logs") || "[]");
-    localStorage.setItem("rail_yard_move_logs", JSON.stringify([...existingLogs, moveLog]));
-
-    // Perform the move
-    setTracks(prev => prev.map(track => {
-      // Remove from source track
-      if (track.id === fromTrackId) {
-        const updatedCars = track.cars.filter(c => c.id !== carId);
-        return {
-          ...track,
-          cars: updatedCars,
-          totalCars: updatedCars.length,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
-        };
-      }
+    setTracks(prev => {
+      // All reads happen inside this callback - no stale state
+      const fromTrack = prev.find(t => t.id === fromTrackId);
+      const car = fromTrack?.cars.find(c => c.id === carId);
       
-      // Add to destination track
-      if (track.id === toTrackId) {
-        const placement = settings.movePlacement || "append";
-        const movedCar = { ...car, status: "pending" as const, confirmedAt: undefined, confirmedBy: undefined };
-        const updatedCars = placement === "prepend" 
-          ? [movedCar, ...track.cars]
-          : [...track.cars, movedCar];
+      if (!fromTrack || !car) {
+        success = false;
+        return prev; // No change
+      }
+
+      const toTrack = prev.find(t => t.id === toTrackId);
+      if (!toTrack) {
+        success = false;
+        return prev; // No change
+      }
+
+      // Duplicate detection using normalized car numbers
+      const normalizedCarNumber = normalizeCarId(car.carNumber);
+      const duplicateExists = toTrack.cars.some(c => normalizeCarId(c.carNumber) === normalizedCarNumber);
+      
+      if (duplicateExists) {
+        success = false;
+        return prev; // No change
+      }
+
+      // Create move log entry
+      const moveLog: MoveLog = {
+        id: `move-${Date.now()}`,
+        carId: car.id,
+        carNumber: car.carNumber,
+        fromTrack: fromTrack.name,
+        toTrack: toTrack.name,
+        timestamp: new Date().toISOString(),
+        crewId: currentUser.crewId,
+        reason,
+      };
+
+      // Store move log (localStorage for now)
+      try {
+        const existingLogs = JSON.parse(localStorage.getItem("rail_yard_move_logs") || "[]");
+        localStorage.setItem("rail_yard_move_logs", JSON.stringify([...existingLogs, moveLog]));
+      } catch (error) {
+        console.error("[moveCar] Failed to save move log:", error);
+      }
+
+      // Perform the move atomically
+      success = true;
+      return prev.map(track => {
+        // Remove from source track
+        if (track.id === fromTrackId) {
+          const updatedCars = track.cars.filter(c => c.id !== carId);
+          return {
+            ...track,
+            cars: updatedCars,
+          };
+        }
         
-        return {
-          ...track,
-          cars: updatedCars,
-          totalCars: updatedCars.length,
-          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
-        };
-      }
-      
-      return track;
-    }));
+        // Add to destination track
+        if (track.id === toTrackId) {
+          const placement = settings.movePlacement || "append";
+          const movedCar = { 
+            ...car, 
+            status: "pending" as const, 
+            confirmedAt: undefined, 
+            confirmedBy: undefined 
+          };
+          const updatedCars = placement === "prepend" 
+            ? [movedCar, ...track.cars]
+            : [...track.cars, movedCar];
+          
+          return {
+            ...track,
+            cars: updatedCars,
+          };
+        }
+        
+        return track;
+      });
+    });
 
-    return true;
+    return success;
   };
 
   const updateLastChecked = (trackId: string) => {
@@ -281,8 +366,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id: `track-${Date.now()}`,
       name: trackName,
       cars: [],
-      totalCars: 0,
-      confirmedCars: 0,
       enabled: true,
     };
     setTracks(prev => [...prev, newTrack]);
@@ -314,18 +397,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const finalOrder = [...orderedCarList, ...missingCars];
 
       // Log the order update event
-      const orderLog = {
-        id: `order-${Date.now()}`,
-        trackId: track.id,
-        trackName: track.name,
-        timestamp: new Date().toISOString(),
-        crewId: currentUser.crewId,
-        reason: "ORDER_UPDATED",
-        carCount: finalOrder.length,
-      };
+      try {
+        const orderLog = {
+          id: `order-${Date.now()}`,
+          trackId: track.id,
+          trackName: track.name,
+          timestamp: new Date().toISOString(),
+          crewId: currentUser.crewId,
+          reason: "ORDER_UPDATED",
+          carCount: finalOrder.length,
+        };
 
-      const existingLogs = JSON.parse(localStorage.getItem("rail_yard_order_logs") || "[]");
-      localStorage.setItem("rail_yard_order_logs", JSON.stringify([...existingLogs, orderLog]));
+        const existingLogs = JSON.parse(localStorage.getItem("rail_yard_order_logs") || "[]");
+        localStorage.setItem("rail_yard_order_logs", JSON.stringify([...existingLogs, orderLog]));
+      } catch (error) {
+        console.error("[commitTrackOrder] Failed to save order log:", error);
+      }
 
       return {
         ...track,
@@ -336,7 +423,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      tracks,
+      tracks: tracksWithCounts,
       currentUser,
       settings,
       appName,
