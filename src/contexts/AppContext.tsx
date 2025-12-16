@@ -65,6 +65,7 @@ interface AppContextType {
   updateSettings: (settings: AppSettings) => void;
   updateBranding: (appName: string, siteName: string) => void;
   updateLastChecked: (trackId: string) => void;
+  updateTrackTimestamp: (trackId: string, field: "lastChecked" | "lastCheckClearedAt") => void;
   addTrack: (trackName: string) => void;
   toggleTrackEnabled: (trackId: string) => void;
   saveTracks: (tracks: Track[]) => void;
@@ -250,6 +251,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ));
   };
 
+  const updateTrackTimestamp = (trackId: string, field: "lastChecked" | "lastCheckClearedAt") => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId 
+        ? { ...track, [field]: new Date().toISOString() }
+        : track
+    ));
+  };
+
   const updateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
     storage.saveSettings(newSettings);
@@ -340,6 +349,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateSettings,
       updateBranding,
       updateLastChecked,
+      updateTrackTimestamp,
       addTrack,
       toggleTrackEnabled,
       saveTracks,

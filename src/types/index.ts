@@ -25,6 +25,7 @@ export interface Track {
   totalCars: number;
   confirmedCars: number;
   lastChecked?: string;
+  lastCheckClearedAt?: string;
   enabled?: boolean;
 }
 

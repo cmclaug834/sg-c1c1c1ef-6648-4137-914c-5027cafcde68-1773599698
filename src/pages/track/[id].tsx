@@ -2,40 +2,11 @@
  * CODE REVIEW REPORT - Track Detail Page
  * ========================================
  * 
- * ISSUES FOUND:
- * 
- * 1. ❌ CRITICAL BUG - handleRemoveCar() persistence failure
- *    - Builds updatedTracks array but never saves it
- *    - Uses window.location.reload() hoping storage is updated
- *    - Root cause of "X/Y counts drift from actual cars" bug
- *    - FIX: Call saveTracks(updatedTracks) before showing toast
- * 
- * 2. ⚠️ DERIVED COUNTS - Progress display in header
- *    - Uses stored track.confirmedCars + pending adjustments
- *    - Should be safe IF confirmCar/unconfirmCar always update storage
- *    - Added diagnostics to verify confirmCar/unconfirmCar consistency
- * 
- * 3. ✅ PENDING CHANGES LOGIC - Looks correct
- *    - pendingConfirmations/pendingUnconfirmations are Sets (no duplicates)
- *    - getEffectiveStatus() correctly prioritizes pending over stored status
- *    - handleYardCheckCompleted() applies all pending before clearing
- * 
- * 4. ✅ NAVIGATION SAFETY - Correct
- *    - handleBack() checks hasPendingChanges and shows discard dialog
- *    - Only routes away after user confirms or no pending changes
- * 
- * 5. ✅ Z-INDEX LAYERING - Fixed in previous task
- *    - Bottom bar: z-[9999] with pointer-events-auto
- *    - Modals: z-50 (standard)
- *    - No stacking conflicts observed
- * 
- * 6. ❌ REMOVE CAR FLOW - Critical bug (see #1)
- *    - Must save updatedTracks, not rely on reload sync
- * 
- * DIAGNOSTICS ADDED:
- * - logDiagnostic() calls at all key state transitions
- * - Tracks before/after snapshots for Done button flow
- * - Persists to localStorage for post-mortem analysis
+ * UPDATES:
+ * - Added lastCheckClearedAt logic to clear check icons after Done
+ * - Added multi-select mode with batch Move and Delete
+ * - Added delete confirmation dialogs for both single and batch deletes
+ * - Fixed handleRemoveCar to use saveTracks instead of reload
  */
 
 import { useApp } from "@/contexts/AppContext";
@@ -49,7 +20,7 @@ import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
 import { logDiagnostic } from "@/lib/diagnostics";
 
 export default function TrackDetail() {
-  const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked, saveTracks } = useApp();
+  const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked, updateTrackTimestamp, saveTracks } = useApp();
   const router = useRouter();
   const { id } = router.query;
   const [showAddModal, setShowAddModal] = useState(false);
@@ -60,18 +31,26 @@ export default function TrackDetail() {
   const [carActionMenu, setCarActionMenu] = useState<{ carId: string; carNumber: string } | null>(null);
   const [removeConfirmCar, setRemoveConfirmCar] = useState<{ carId: string; carNumber: string } | null>(null);
   
-  // NEW: Pending changes tracking
+  // Pending changes tracking
   const [pendingConfirmations, setPendingConfirmations] = useState<Set<string>>(new Set());
   const [pendingUnconfirmations, setPendingUnconfirmations] = useState<Set<string>>(new Set());
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [commitToast, setCommitToast] = useState<string | null>(null);
 
+  // NEW: Multi-select mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedCarIds, setSelectedCarIds] = useState<Set<string>>(new Set());
+  const [showBatchMoveModal, setShowBatchMoveModal] = useState(false);
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+
   const track = tracks.find(t => t.id === id);
 
-  // NEW: Reset pending changes when track changes
+  // Reset pending changes and selection when track changes
   useEffect(() => {
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
+    setSelectedCarIds(new Set());
+    setSelectionMode(false);
   }, [id]);
 
   if (!track) {
@@ -82,17 +61,31 @@ export default function TrackDetail() {
     );
   }
 
-  // NEW: Check if there are pending changes
+  // Check if there are pending changes
   const hasPendingChanges = pendingConfirmations.size > 0 || pendingUnconfirmations.size > 0;
 
-  // NEW: Get effective car status (including pending changes)
+  // Get effective car status (including pending changes)
   const getEffectiveStatus = (carId: string, currentStatus: string) => {
     if (pendingConfirmations.has(carId)) return "confirmed";
     if (pendingUnconfirmations.has(carId)) return "pending";
     return currentStatus;
   };
 
+  // NEW: Determine if check should be visually shown
+  const isVisuallyChecked = (car: any) => {
+    if (car.status !== "confirmed") return false;
+    if (!track.lastCheckClearedAt) return true;
+    if (!car.confirmedAt) return false;
+    return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
+  };
+
   const handleToggleConfirm = (carId: string, currentStatus: string, carNumber: string) => {
+    // Don't toggle if in selection mode
+    if (selectionMode) {
+      handleToggleSelection(carId);
+      return;
+    }
+
     if (currentStatus === "missing") {
       return;
     }
@@ -114,7 +107,6 @@ export default function TrackDetail() {
       if (settings.requireUnconfirmDialog) {
         setUnconfirmDialogCar({ trackId: track.id, carId, carNumber });
       } else {
-        // NEW: Add to pending unconfirmations
         setPendingUnconfirmations(prev => new Set(prev).add(carId));
         setPendingConfirmations(prev => {
           const next = new Set(prev);
@@ -123,7 +115,6 @@ export default function TrackDetail() {
         });
       }
     } else {
-      // NEW: Add to pending confirmations
       setPendingConfirmations(prev => new Set(prev).add(carId));
       setPendingUnconfirmations(prev => {
         const next = new Set(prev);
@@ -147,7 +138,6 @@ export default function TrackDetail() {
 
   const handleUnconfirmConfirmed = () => {
     if (unconfirmDialogCar) {
-      // NEW: Add to pending unconfirmations
       setPendingUnconfirmations(prev => new Set(prev).add(unconfirmDialogCar.carId));
       setPendingConfirmations(prev => {
         const next = new Set(prev);
@@ -156,6 +146,105 @@ export default function TrackDetail() {
       });
       setUnconfirmDialogCar(null);
     }
+  };
+
+  // NEW: Toggle selection mode
+  const handleToggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedCarIds(new Set());
+  };
+
+  // NEW: Toggle individual car selection
+  const handleToggleSelection = (carId: string) => {
+    setSelectedCarIds(prev => {
+      const next = new Set(prev);
+      if (next.has(carId)) {
+        next.delete(carId);
+      } else {
+        next.add(carId);
+      }
+      return next;
+    });
+  };
+
+  // NEW: Batch move selected cars
+  const handleBatchMove = (targetTrackId: string, targetTrackName: string) => {
+    let movedCount = 0;
+    let skippedCount = 0;
+
+    selectedCarIds.forEach(carId => {
+      const success = moveCar(carId, track.id, targetTrackId, "DAY_MOVE");
+      if (success) {
+        movedCount++;
+      } else {
+        skippedCount++;
+      }
+    });
+
+    setShowBatchMoveModal(false);
+    setSelectedCarIds(new Set());
+    setSelectionMode(false);
+
+    if (skippedCount > 0) {
+      setMoveToast(`Moved ${movedCount} cars. ${skippedCount} skipped (duplicates).`);
+    } else {
+      setMoveToast(`Moved ${movedCount} cars to ${targetTrackName}`);
+    }
+    
+    setTimeout(() => setMoveToast(null), 3000);
+  };
+
+  // NEW: Batch delete selected cars
+  const handleBatchDeleteConfirmed = () => {
+    if (!currentUser) return;
+
+    const selectedCars = track.cars.filter(car => selectedCarIds.has(car.id));
+
+    // Log removal events
+    selectedCars.forEach(car => {
+      const removeLog = {
+        id: `remove-${Date.now()}-${car.id}`,
+        carId: car.id,
+        carNumber: car.carNumber,
+        trackId: track.id,
+        trackName: track.name,
+        timestamp: new Date().toISOString(),
+        crewId: currentUser.crewId,
+        reason: "BATCH_REMOVED",
+      };
+
+      const existingLogs = JSON.parse(localStorage.getItem("rail_yard_remove_logs") || "[]");
+      localStorage.setItem("rail_yard_remove_logs", JSON.stringify([...existingLogs, removeLog]));
+    });
+
+    // Build updated tracks
+    const updatedTracks = tracks.map(t => {
+      if (t.id === track.id) {
+        const updatedCars = t.cars.filter(c => !selectedCarIds.has(c.id));
+        return {
+          ...t,
+          cars: updatedCars,
+          totalCars: updatedCars.length,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+      }
+      return t;
+    });
+
+    // Save the updated tracks
+    saveTracks(updatedTracks);
+
+    // Log diagnostic after save
+    const updatedTrack = updatedTracks.find(t => t.id === track.id);
+    if (updatedTrack) {
+      logDiagnostic("BATCH_DELETE_COMPLETE", updatedTrack);
+    }
+
+    setShowBatchDeleteConfirm(false);
+    setSelectedCarIds(new Set());
+    setSelectionMode(false);
+    setMoveToast(`Removed ${selectedCars.length} cars from track`);
+    setTimeout(() => setMoveToast(null), 3000);
   };
 
   const handleMoveCar = (carId: string, carNumber: string) => {
@@ -181,7 +270,7 @@ export default function TrackDetail() {
     const existingLogs = JSON.parse(localStorage.getItem("rail_yard_remove_logs") || "[]");
     localStorage.setItem("rail_yard_remove_logs", JSON.stringify([...existingLogs, removeLog]));
 
-    // FIXED: Build updated tracks AND save them (was missing saveTracks call)
+    // Build updated tracks AND save them
     const updatedTracks = tracks.map(t => {
       if (t.id === track.id) {
         const updatedCars = t.cars.filter(c => c.id !== carId);
@@ -195,7 +284,7 @@ export default function TrackDetail() {
       return t;
     });
 
-    // FIX: Save the updated tracks immediately
+    // Save the updated tracks immediately
     saveTracks(updatedTracks);
 
     // Log diagnostic after save
@@ -225,7 +314,7 @@ export default function TrackDetail() {
     setMovePickerCar(null);
   };
 
-  // NEW: Handle back button with pending changes check
+  // Handle back button with pending changes check
   const handleBack = () => {
     if (hasPendingChanges) {
       setShowDiscardDialog(true);
@@ -234,7 +323,7 @@ export default function TrackDetail() {
     }
   };
 
-  // NEW: Discard pending changes and go back
+  // Discard pending changes and go back
   const handleDiscardChanges = () => {
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
@@ -242,7 +331,7 @@ export default function TrackDetail() {
     router.push("/tracks");
   };
 
-  // NEW: Commit all pending changes
+  // NEW: Commit all pending changes and clear check icons
   const handleYardCheckCompleted = () => {
     if (!track) return;
 
@@ -282,6 +371,9 @@ export default function TrackDetail() {
 
     // Update last checked timestamp
     updateLastChecked(track.id);
+    
+    // NEW: Clear check icons by setting lastCheckClearedAt
+    updateTrackTimestamp(track.id, "lastCheckClearedAt");
 
     // Log after updateLastChecked
     const updatedTrack = tracks.find(t => t.id === track.id);
@@ -379,26 +471,41 @@ export default function TrackDetail() {
             )}
           </div>
 
-          <button
-            id="B.filterToggle"
-            onClick={() => setShowUnconfirmedOnly(!showUnconfirmedOnly)}
-            className={`w-full p-4 rounded-xl text-left transition-colors text-base md:text-lg font-medium ${
-              showUnconfirmedOnly 
-                ? "bg-yellow-600 hover:bg-yellow-700 text-white" 
-                : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span>Unconfirmed only</span>
-              <div className={`w-12 h-7 rounded-full transition-colors relative ${
-                showUnconfirmedOnly ? "bg-yellow-800" : "bg-zinc-700"
-              }`}>
-                <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
-                  showUnconfirmedOnly ? "translate-x-5" : ""
-                }`} />
+          <div className="flex gap-3 mb-4">
+            <button
+              id="B.filterToggle"
+              onClick={() => setShowUnconfirmedOnly(!showUnconfirmedOnly)}
+              className={`flex-1 p-4 rounded-xl text-left transition-colors text-base md:text-lg font-medium ${
+                showUnconfirmedOnly 
+                  ? "bg-yellow-600 hover:bg-yellow-700 text-white" 
+                  : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span>Unconfirmed only</span>
+                <div className={`w-12 h-7 rounded-full transition-colors relative ${
+                  showUnconfirmedOnly ? "bg-yellow-800" : "bg-zinc-700"
+                }`}>
+                  <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                    showUnconfirmedOnly ? "translate-x-5" : ""
+                  }`} />
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+
+            {/* NEW: Select Mode Toggle */}
+            <button
+              id="B.selectModeToggle"
+              onClick={handleToggleSelectionMode}
+              className={`flex-1 p-4 rounded-xl text-center transition-colors text-base md:text-lg font-medium ${
+                selectionMode 
+                  ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                  : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+              }`}
+            >
+              {selectionMode ? `Selected: ${selectedCarIds.size}` : "Select"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -419,11 +526,15 @@ export default function TrackDetail() {
               {filteredCars.map(car => {
                 const effectiveStatus = getEffectiveStatus(car.id, car.status);
                 const isPending = pendingConfirmations.has(car.id) || pendingUnconfirmations.has(car.id);
+                const isSelected = selectedCarIds.has(car.id);
+                const visuallyChecked = isVisuallyChecked(car);
 
                 return (
                   <div
                     key={car.id}
-                    className="B.carRow bg-zinc-800 rounded-xl overflow-hidden"
+                    className={`B.carRow bg-zinc-800 rounded-xl overflow-hidden ${
+                      isSelected ? "ring-2 ring-blue-500" : ""
+                    }`}
                   >
                     <div className="flex items-center">
                       <button
@@ -432,15 +543,33 @@ export default function TrackDetail() {
                         className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="B.confirmStateIcon flex-shrink-0">
-                            {effectiveStatus === "confirmed" ? (
-                              <CheckCircle2 className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-green-500'}`} />
-                            ) : car.status === "missing" ? (
-                              <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
-                            ) : (
-                              <Circle className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-zinc-600'}`} />
-                            )}
-                          </div>
+                          {/* NEW: Show checkbox in selection mode */}
+                          {selectionMode && (
+                            <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
+                              isSelected
+                                ? "bg-blue-600 border-blue-600"
+                                : "border-zinc-600"
+                            }`}>
+                              {isSelected && (
+                                <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Check icon - only in non-selection mode */}
+                          {!selectionMode && (
+                            <div className="B.confirmStateIcon flex-shrink-0">
+                              {effectiveStatus === "confirmed" && visuallyChecked ? (
+                                <CheckCircle2 className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-green-500'}`} />
+                              ) : car.status === "missing" ? (
+                                <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
+                              ) : (
+                                <Circle className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-zinc-600'}`} />
+                              )}
+                            </div>
+                          )}
 
                           <div className="flex-1 min-w-0">
                             <div className="B.carNumber text-3xl md:text-4xl font-bold font-mono mb-1">
@@ -457,7 +586,8 @@ export default function TrackDetail() {
                               </div>
                             )}
 
-                            {!isPending && effectiveStatus === "confirmed" && car.confirmedAt && (
+                            {/* NEW: Always show "Confirmed by" text if it exists, regardless of visual check state */}
+                            {!isPending && car.status === "confirmed" && car.confirmedAt && (
                               <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
                                 Confirmed {formatConfirmedTime(car.confirmedAt)}
                                 {car.confirmedBy && ` by ${car.confirmedBy}`}
@@ -473,15 +603,17 @@ export default function TrackDetail() {
                         </div>
                       </button>
 
-                      {/* B.rowMenuBtn */}
-                      <button
-                        id="B.rowMenuBtn"
-                        onClick={() => setCarActionMenu({ carId: car.id, carNumber: car.carNumber })}
-                        className="p-6 hover:bg-zinc-700 transition-colors border-l border-zinc-700"
-                        aria-label="Car actions"
-                      >
-                        <MoreVertical className="w-6 h-6 md:w-7 md:h-7 text-zinc-400" />
-                      </button>
+                      {/* B.rowMenuBtn - Hide in selection mode */}
+                      {!selectionMode && (
+                        <button
+                          id="B.rowMenuBtn"
+                          onClick={() => setCarActionMenu({ carId: car.id, carNumber: car.carNumber })}
+                          className="p-6 hover:bg-zinc-700 transition-colors border-l border-zinc-700"
+                          aria-label="Car actions"
+                        >
+                          <MoreVertical className="w-6 h-6 md:w-7 md:h-7 text-zinc-400" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -491,46 +623,75 @@ export default function TrackDetail() {
         </div>
       </div>
 
-      {/* NEW: Consolidated Sticky Bottom Action Bar */}
+      {/* Consolidated Sticky Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-[9999] pointer-events-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="max-w-4xl mx-auto p-4">
-          <div className="grid grid-cols-4 gap-3">
-            {/* Back Button */}
-            <button
-              id="B.backActionBtn"
-              onClick={handleBack}
-              className="py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-base md:text-lg font-bold transition-colors"
-            >
-              Back
-            </button>
+          {selectionMode && selectedCarIds.size > 0 ? (
+            // NEW: Batch action buttons when items selected
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                id="B.cancelSelectionBtn"
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedCarIds(new Set());
+                }}
+                className="py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+              >
+                Cancel
+              </button>
 
-            {/* Import Button */}
-            <button
-              id="B.importActionBtn"
-              onClick={() => router.push(`/track/${id}/import`)}
-              className="py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-base md:text-lg font-bold transition-colors"
-            >
-              Import
-            </button>
+              <button
+                id="B.batchMoveBtn"
+                onClick={() => setShowBatchMoveModal(true)}
+                className="py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+              >
+                Move ({selectedCarIds.size})
+              </button>
 
-            {/* Add Car Button */}
-            <button
-              id="B.addCarActionBtn"
-              onClick={() => setShowAddModal(true)}
-              className="py-4 bg-green-600 hover:bg-green-700 rounded-xl text-base md:text-lg font-bold transition-colors"
-            >
-              Add +
-            </button>
+              <button
+                id="B.batchDeleteBtn"
+                onClick={() => setShowBatchDeleteConfirm(true)}
+                className="py-4 bg-red-600 hover:bg-red-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+              >
+                Delete ({selectedCarIds.size})
+              </button>
+            </div>
+          ) : (
+            // Original action buttons
+            <div className="grid grid-cols-4 gap-3">
+              <button
+                id="B.backActionBtn"
+                onClick={handleBack}
+                className="py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+              >
+                Back
+              </button>
 
-            {/* Yard Check Completed Button */}
-            <button
-              id="B.yardCheckCompletedBtn"
-              onClick={handleYardCheckCompleted}
-              className="py-4 bg-green-600 hover:bg-green-700 rounded-xl text-base md:text-lg font-bold transition-colors border-2 border-green-400"
-            >
-              Done
-            </button>
-          </div>
+              <button
+                id="B.importActionBtn"
+                onClick={() => router.push(`/track/${id}/import`)}
+                className="py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+              >
+                Import
+              </button>
+
+              <button
+                id="B.addCarActionBtn"
+                onClick={() => setShowAddModal(true)}
+                className="py-4 bg-green-600 hover:bg-green-700 rounded-xl text-base md:text-lg font-bold transition-colors"
+              >
+                Add +
+              </button>
+
+              <button
+                id="B.yardCheckCompletedBtn"
+                onClick={handleYardCheckCompleted}
+                className="py-4 bg-green-600 hover:bg-green-700 rounded-xl text-base md:text-lg font-bold transition-colors border-2 border-green-400"
+              >
+                Done
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -561,7 +722,6 @@ export default function TrackDetail() {
             </p>
 
             <div className="space-y-3 mb-6">
-              {/* B.rowActionMove */}
               <button
                 id="B.rowActionMove"
                 onClick={() => handleMoveCar(carActionMenu.carId, carActionMenu.carNumber)}
@@ -570,7 +730,6 @@ export default function TrackDetail() {
                 Move to Track…
               </button>
 
-              {/* B.rowActionRemove */}
               <button
                 id="B.rowActionRemove"
                 onClick={() => {
@@ -626,16 +785,80 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* B.removeConfirmDialog */}
+      {/* NEW: Batch Move Modal */}
+      {showBatchMoveModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <h2 className="text-2xl font-bold mb-2">Move Selected Cars</h2>
+            <p className="text-zinc-400 text-base mb-6">
+              Move {selectedCarIds.size} cars to which track?
+            </p>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto mb-6">
+              {otherTracks.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleBatchMove(t.id, t.name)}
+                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium text-left px-4 transition-colors"
+                >
+                  Move to {t.name}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowBatchMoveModal(false)}
+              className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Batch Delete Confirmation Dialog */}
+      {showBatchDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <h2 className="text-2xl font-bold mb-4">
+              Delete selected cars?
+            </h2>
+
+            <p className="text-zinc-400 text-lg mb-2">
+              This will remove {selectedCarIds.size} cars from {track.name}.
+            </p>
+            
+            <p className="text-zinc-500 text-base mb-6">
+              History will be kept in logs.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBatchDeleteConfirm(false)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleBatchDeleteConfirmed}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* B.removeConfirmDialog - Single car delete confirmation */}
       {removeConfirmCar && (
         <div id="B.removeConfirmDialog" className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
-            {/* B.removeConfirmTitle */}
             <h2 id="B.removeConfirmTitle" className="text-2xl font-bold mb-4">
               Remove this car from the list?
             </h2>
 
-            {/* B.removeConfirmBody */}
             <p id="B.removeConfirmBody" className="text-zinc-400 text-lg mb-2">
               This removes it from this track's active list (history is kept).
             </p>
@@ -645,7 +868,6 @@ export default function TrackDetail() {
             </p>
 
             <div className="flex gap-3">
-              {/* B.removeCancelBtn */}
               <button
                 id="B.removeCancelBtn"
                 onClick={() => setRemoveConfirmCar(null)}
@@ -654,7 +876,6 @@ export default function TrackDetail() {
                 Cancel
               </button>
 
-              {/* B.removeConfirmBtn */}
               <button
                 id="B.removeConfirmBtn"
                 onClick={() => handleRemoveCar(removeConfirmCar.carId)}
@@ -667,7 +888,7 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* NEW: Discard Changes Dialog */}
+      {/* Discard Changes Dialog */}
       {showDiscardDialog && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
@@ -702,7 +923,7 @@ export default function TrackDetail() {
         </div>
       )}
 
-      {/* NEW: Commit Success Toast */}
+      {/* Commit Success Toast */}
       {commitToast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-green-700">
           <p className="text-base md:text-lg font-medium">{commitToast}</p>
