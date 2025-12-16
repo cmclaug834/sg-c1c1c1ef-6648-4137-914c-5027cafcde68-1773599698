@@ -55,13 +55,16 @@ export default function TrackReorder() {
 
   const handleReset = () => {
     // Reset to original order
-    setLeftCars([]);
-    setRightCars([...track.cars]);
+    if (track) {
+      setLeftCars([...track.cars]);
+      setRightCars([]);
+    }
   };
 
   const handleConfirm = () => {
-    // Commit the new order using existing commitTrackOrder
-    commitTrackOrder(track.id, rightCars);
+    // Commit the new order: right panel first, then remaining left panel
+    const finalOrder = [...rightCars, ...leftCars];
+    commitTrackOrder(track.id, finalOrder);
     router.push(`/track/${track.id}`);
   };
 
