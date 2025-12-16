@@ -7,11 +7,12 @@
  * - Added multi-select mode with batch Move and Delete
  * - Added delete confirmation dialogs for both single and batch deletes
  * - Fixed handleRemoveCar to use saveTracks instead of reload
+ * - Added separate "Shift Status" icon system with legend
  */
 
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, Upload } from "lucide-react";
+import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, Upload, BadgeCheck, CircleDashed } from "lucide-react";
 import { useState, useEffect } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -77,6 +78,27 @@ export default function TrackDetail() {
     if (!track.lastCheckClearedAt) return true;
     if (!car.confirmedAt) return false;
     return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
+  };
+
+  // NEW: Determine if car was checked this shift
+  const isCheckedThisShift = (car: any) => {
+    if (car.status !== "confirmed") return false;
+    if (!car.confirmedAt) return false;
+    if (!track.lastCheckClearedAt) return true; // No clear timestamp = treat as checked
+    return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
+  };
+
+  // NEW: Get shift status icon
+  const getShiftStatusIcon = (car: any) => {
+    if (car.status === "missing") {
+      return <AlertTriangle className="w-6 h-6 md:w-7 md:h-7 text-yellow-500" />;
+    }
+    
+    if (isCheckedThisShift(car)) {
+      return <BadgeCheck className="w-6 h-6 md:w-7 md:h-7 text-green-500" />;
+    }
+    
+    return <CircleDashed className="w-6 h-6 md:w-7 md:h-7 text-zinc-600" />;
   };
 
   const handleToggleConfirm = (carId: string, currentStatus: string, carNumber: string) => {
@@ -409,8 +431,9 @@ export default function TrackDetail() {
     }, 1500);
   };
 
+  // UPDATED: Filter logic for "Unconfirmed only" toggle
   const filteredCars = showUnconfirmedOnly 
-    ? track.cars.filter(car => getEffectiveStatus(car.id, car.status) === "pending")
+    ? track.cars.filter(car => !isCheckedThisShift(car))
     : track.cars;
 
   const otherTracks = tracks.filter(t => t.id !== track.id && t.enabled !== false);
@@ -471,6 +494,24 @@ export default function TrackDetail() {
             )}
           </div>
 
+          {/* NEW: Shift Status Legend */}
+          <div className="bg-zinc-800/50 p-3 rounded-lg mb-4">
+            <div className="flex items-center justify-around text-xs md:text-sm">
+              <div className="flex items-center gap-2">
+                <BadgeCheck className="w-4 h-4 text-green-500" />
+                <span className="text-zinc-400">Checked this shift</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CircleDashed className="w-4 h-4 text-zinc-600" />
+                <span className="text-zinc-400">Not checked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                <span className="text-zinc-400">Missing</span>
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-3 mb-4">
             <button
               id="B.filterToggle"
@@ -482,7 +523,7 @@ export default function TrackDetail() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span>Unconfirmed only</span>
+                <span>Not checked only</span>
                 <div className={`w-12 h-7 rounded-full transition-colors relative ${
                   showUnconfirmedOnly ? "bg-yellow-800" : "bg-zinc-700"
                 }`}>
@@ -515,7 +556,7 @@ export default function TrackDetail() {
           {filteredCars.length === 0 ? (
             <div className="text-center py-12 text-zinc-500">
               <p className="text-xl md:text-2xl mb-2">
-                {showUnconfirmedOnly ? "All cars confirmed!" : "No cars on this track"}
+                {showUnconfirmedOnly ? "All cars checked this shift!" : "No cars on this track"}
               </p>
               {!showUnconfirmedOnly && (
                 <p className="text-base md:text-lg">Tap + to add a car</p>
@@ -527,7 +568,7 @@ export default function TrackDetail() {
                 const effectiveStatus = getEffectiveStatus(car.id, car.status);
                 const isPending = pendingConfirmations.has(car.id) || pendingUnconfirmations.has(car.id);
                 const isSelected = selectedCarIds.has(car.id);
-                const visuallyChecked = isVisuallyChecked(car);
+                const checkedThisShift = isCheckedThisShift(car);
 
                 return (
                   <div
@@ -543,7 +584,12 @@ export default function TrackDetail() {
                         className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-4">
-                          {/* NEW: Show checkbox in selection mode */}
+                          {/* NEW: Shift Status Icon (left side) */}
+                          <div className="flex-shrink-0">
+                            {getShiftStatusIcon(car)}
+                          </div>
+
+                          {/* Existing checkbox or selection checkbox */}
                           {selectionMode && (
                             <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
                               isSelected
@@ -558,10 +604,10 @@ export default function TrackDetail() {
                             </div>
                           )}
 
-                          {/* Check icon - only in non-selection mode */}
+                          {/* Existing confirm state checkbox (only when not in selection mode) */}
                           {!selectionMode && (
                             <div className="B.confirmStateIcon flex-shrink-0">
-                              {effectiveStatus === "confirmed" && visuallyChecked ? (
+                              {effectiveStatus === "confirmed" && checkedThisShift ? (
                                 <CheckCircle2 className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-green-500'}`} />
                               ) : car.status === "missing" ? (
                                 <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
@@ -586,7 +632,7 @@ export default function TrackDetail() {
                               </div>
                             )}
 
-                            {/* NEW: Always show "Confirmed by" text if it exists, regardless of visual check state */}
+                            {/* Keep "Confirmed by" text */}
                             {!isPending && car.status === "confirmed" && car.confirmedAt && (
                               <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
                                 Confirmed {formatConfirmedTime(car.confirmedAt)}
