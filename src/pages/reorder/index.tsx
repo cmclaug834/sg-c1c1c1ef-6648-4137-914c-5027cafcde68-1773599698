@@ -1,16 +1,16 @@
 import { useRouter } from "next/router";
-
-const MASTER_TRACK_LIST = [
-  "AS28", "AS29", "AS30", "AS31", "AS32", "AS33",
-  "AS34", "AS38", "AS39", "AS46", "AS47", "AS48"
-];
+import { useApp } from "@/contexts/AppContext";
 
 export default function ReorderTrackSelect() {
   const router = useRouter();
+  const { tracks } = useApp();
 
-  const handleTrackSelect = (trackName: string) => {
-    router.push(`/reorder/${trackName}`);
+  const handleTrackSelect = (trackId: string) => {
+    router.push(`/reorder/${trackId}`);
   };
+
+  // Filter to only enabled tracks
+  const enabledTracks = tracks.filter(track => track.enabled !== false);
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white pb-24">
@@ -27,15 +27,15 @@ export default function ReorderTrackSelect() {
 
         {/* H.trackList */}
         <div id="H.trackList" className="space-y-3 md:space-y-4">
-          {MASTER_TRACK_LIST.map(trackName => (
+          {enabledTracks.map(track => (
             <button
-              key={trackName}
-              onClick={() => handleTrackSelect(trackName)}
+              key={track.id}
+              onClick={() => handleTrackSelect(track.id)}
               className="H.trackRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors"
             >
               {/* H.trackName */}
               <h2 className="H.trackName text-2xl md:text-3xl font-bold font-mono">
-                {trackName}
+                {track.name}
               </h2>
             </button>
           ))}

@@ -40,15 +40,7 @@ export default function TrackReorder() {
   if (!track) {
     return (
       <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-zinc-400 mb-2">Track not found</p>
-          <button
-            onClick={() => router.push("/reorder")}
-            className="text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            ← Back to track selection
-          </button>
-        </div>
+        <p className="text-xl text-zinc-400">Track not found</p>
       </div>
     );
   }
