@@ -77,8 +77,10 @@ export default function FrontPage() {
           name: activeCrew.name,
           crewId: activeCrew.crewId,
         });
-        // Navigate to tracks
-        router.push("/tracks");
+        // Navigate to tracks after a tick to avoid iframe security issues
+        setTimeout(() => {
+          router.push("/tracks");
+        }, 0);
         return;
       }
     }
@@ -133,8 +135,10 @@ export default function FrontPage() {
     const nextShiftChange = computeNextShiftChange(shiftA, shiftB);
     storage.saveSessionExpiresAt(nextShiftChange);
 
-    // Navigate to track list
-    router.push("/tracks");
+    // Navigate to track list after a tick to avoid iframe security issues
+    setTimeout(() => {
+      router.push("/tracks");
+    }, 0);
   };
 
   const mostRecent = profileStorage.getMostRecent();
