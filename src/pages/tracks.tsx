@@ -18,13 +18,26 @@ export default function TrackSelect() {
   }, []);
 
   useEffect(() => {
-    if (mounted && !currentUser) {
+    // Allow hydration to occur before enforcing guard
+    if (!mounted) return;
+    if (currentUser === null) {
       router.push("/");
     }
   }, [mounted, currentUser, router]);
 
-  if (!mounted || !currentUser) {
+  if (!mounted) {
     return null;
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Start Morning Yard Check</h2>
+          <p className="text-zinc-400">Please enter your crew name and ID to begin.</p>
+        </div>
+      </div>
+    );
   }
 
   const currentDate = new Date().toLocaleDateString("en-US", {

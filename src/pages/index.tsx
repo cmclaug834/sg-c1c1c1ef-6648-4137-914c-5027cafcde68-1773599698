@@ -116,12 +116,20 @@ export default function FrontPage() {
     // Save/update profile
     profileStorage.upsertProfile(name.trim(), crewId.trim());
 
-    // Set user in context
-    setUser({
+    // Create user object
+    const user: User = {
       id: `user-${Date.now()}`,
       name: name.trim(),
       crewId: crewId.trim(),
-    });
+    };
+
+    // Set user in context
+    setUser(user);
+
+    // Save to localStorage
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("rail_yard_user", JSON.stringify(user));
+    }
 
     // Save active crew session
     storage.saveActiveCrew({
@@ -135,10 +143,8 @@ export default function FrontPage() {
     const nextShiftChange = computeNextShiftChange(shiftA, shiftB);
     storage.saveSessionExpiresAt(nextShiftChange);
 
-    // Navigate to track list after a tick to avoid iframe security issues
-    setTimeout(() => {
-      router.push("/tracks");
-    }, 0);
+    // Navigate to track list
+    router.push("/tracks");
   };
 
   const mostRecent = profileStorage.getMostRecent();
@@ -268,6 +274,7 @@ export default function FrontPage() {
         {/* FRONT.startBtn */}
         <button
           id="FRONT.startBtn"
+          type="button"
           onClick={handleStartYardCheck}
           disabled={!isValid}
           className={`w-full py-5 rounded-xl text-xl font-bold transition-colors flex items-center justify-center gap-3 ${

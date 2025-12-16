@@ -146,10 +146,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const loadedTracks = storage.getTracks();
     const repairedTracks = repairTrackData(loadedTracks);
     setTracks(repairedTracks);
-    setCurrentUser(storage.getUser());
     setSettings(storage.getSettings());
     setAppName(storage.getAppName());
     setSiteName(storage.getSiteName());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = window.localStorage.getItem("rail_yard_user");
+    if (!raw) return;
+
+    try {
+      const user = JSON.parse(raw);
+      setCurrentUser(user);
+    } catch {
+      setCurrentUser(null);
+    }
   }, []);
 
   useEffect(() => {
