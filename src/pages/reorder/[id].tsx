@@ -10,8 +10,11 @@ export default function TrackReorder() {
   const router = useRouter();
   const { id } = router.query;
 
+  // Normalize route param
+  const trackId = Array.isArray(id) ? id[0] : id;
+
   // Find track by id (not name)
-  const track = tracks.find(t => t.id === id);
+  const track = tracks.find(t => t.id === trackId);
   
   const [leftCars, setLeftCars] = useState<RailCar[]>([]);
   const [rightCars, setRightCars] = useState<RailCar[]>([]);
@@ -24,7 +27,16 @@ export default function TrackReorder() {
     }
   }, [track]);
 
-  // Show fallback if track not found
+  // Loading guard: wait for router and data to be ready
+  if (!router.isReady || !trackId || tracks.length === 0) {
+    return (
+      <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
+        <p className="text-xl text-zinc-400">Loading…</p>
+      </div>
+    );
+  }
+
+  // Show fallback if track not found (after loading completes)
   if (!track) {
     return (
       <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
