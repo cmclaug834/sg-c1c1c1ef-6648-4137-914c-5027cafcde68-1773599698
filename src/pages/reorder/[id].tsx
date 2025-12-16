@@ -6,15 +6,17 @@ import { normalizeCarId } from "@/lib/carIdFormatter";
 import { RailCar } from "@/types";
 
 export default function TrackReorder() {
-  const { tracks, saveTracks } = useApp();
+  const { tracks, commitTrackOrder } = useApp();
   const router = useRouter();
   const { id } = router.query;
 
+  // Find track by id (not name)
   const track = tracks.find(t => t.id === id);
   
   const [leftCars, setLeftCars] = useState<RailCar[]>([]);
   const [rightCars, setRightCars] = useState<RailCar[]>([]);
 
+  // Initialize reorder state when track is available
   useEffect(() => {
     if (track) {
       setLeftCars([...track.cars]);
@@ -22,10 +24,19 @@ export default function TrackReorder() {
     }
   }, [track]);
 
+  // Show fallback if track not found
   if (!track) {
     return (
       <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
-        <p className="text-xl text-zinc-400">Track not found</p>
+        <div className="text-center">
+          <p className="text-xl text-zinc-400 mb-2">Track not found</p>
+          <button
+            onClick={() => router.push("/reorder")}
+            className="text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            ← Back to track selection
+          </button>
+        </div>
       </div>
     );
   }
@@ -44,30 +55,18 @@ export default function TrackReorder() {
 
   const handleReset = () => {
     // Reset to original order
-    if (track) {
-      setLeftCars([]);
-      setRightCars([...track.cars]);
-    }
+    setLeftCars([]);
+    setRightCars([...track.cars]);
   };
 
   const handleConfirm = () => {
-    // Commit the new order: rightCars becomes the new car order
-    const updatedTracks = tracks.map(t => {
-      if (t.id === track.id) {
-        return {
-          ...t,
-          cars: rightCars,
-        };
-      }
-      return t;
-    });
-    
-    saveTracks(updatedTracks);
-    router.push(`/track/${id}`);
+    // Commit the new order using existing commitTrackOrder
+    commitTrackOrder(track.id, rightCars);
+    router.push(`/track/${track.id}`);
   };
 
   const handleCancel = () => {
-    router.push(`/track/${id}`);
+    router.push(`/track/${track.id}`);
   };
 
   return (
