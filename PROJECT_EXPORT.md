@@ -1,6 +1,6 @@
 # Rail Yard Tracker - Complete Project Export
 **Generated:** 2025-12-16
-**Tech Stack:** Next.js 15.2 (Pages Router), TypeScript, Tailwind CSS v3, React 18
+**Tech Stack:** Next.js 15.2 (Pages Router), TypeScript, React 18
 
 ---
 
@@ -374,37 +374,15 @@ function getInitialTracks(): Track[] {
 **File:** `src/lib/carIdFormatter.ts`
 
 ```typescript
-/**
- * GLOBAL RULE: NormalizedCarId
- * 
- * Normalizes and formats car IDs consistently throughout the application.
- * 
- * Rules:
- * - Accept any input containing letters and digits (spaces/punctuation allowed)
- * - Extract letters as prefix (A-Z only) and digits as number (0-9 only)
- * - Uppercase prefix
- * - Remove all spaces and punctuation from the number and concatenate digits
- * - Display format: PREFIX + single space + DIGITS
- * 
- * Examples:
- * - "t box 663 566" → "TBOX 663566"
- * - "tbox663566" → "TBOX 663566"
- * - "TBOX-663-566" → "TBOX 663566"
- * - "abc123def456" → "ABCDEF 123456"
- */
-
 export function normalizeCarId(input: string): string {
   if (!input) return "";
   
-  // Extract only letters (A-Z) and digits (0-9)
   const letters = input.match(/[a-zA-Z]/g) || [];
   const digits = input.match(/[0-9]/g) || [];
   
-  // Uppercase prefix and join digits
   const prefix = letters.join("").toUpperCase();
   const number = digits.join("");
   
-  // Return formatted: PREFIX + space + DIGITS
   if (!prefix && !number) return "";
   if (!prefix) return number;
   if (!number) return prefix;
@@ -412,9 +390,6 @@ export function normalizeCarId(input: string): string {
   return `${prefix} ${number}`;
 }
 
-/**
- * Validates if a car ID input is valid (contains at least some letters or digits)
- */
 export function isValidCarId(input: string): boolean {
   return /[a-zA-Z0-9]/.test(input);
 }
@@ -422,7 +397,362 @@ export function isValidCarId(input: string): boolean {
 
 ---
 
-### 4. BOTTOM NAVIGATION
+### 4. APP CONTEXT (CORE STATE MANAGEMENT)
+
+**File:** `src/contexts/AppContext.tsx` (Key Functions)
+
+```typescript
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { Track, User, RailCar, AppSettings, MoveLog } from "@/types";
+import { storage } from "@/lib/storage";
+import { logDiagnostic } from "@/lib/diagnostics";
+
+function generateUniqueCarId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `car-${crypto.randomUUID()}`;
+  }
+  return `car-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function repairTrackData(tracks: Track[]): Track[] {
+  let repairCount = 0;
+  const usedIds = new Set<string>();
+
+  const repairedTracks = tracks.map(track => {
+    const repairedCars = track.cars.map(car => {
+      if (!car.id || usedIds.has(car.id)) {
+        const oldId = car.id || "(missing)";
+        const newId = generateUniqueCarId();
+        repairCount++;
+        console.warn(`[DATA REPAIR] Track ${track.name}: Fixed car ${car.carNumber} - ID ${oldId} → ${newId}`);
+        usedIds.add(newId);
+        return { ...car, id: newId };
+      }
+      usedIds.add(car.id);
+      return car;
+    });
+
+    return {
+      ...track,
+      cars: repairedCars,
+    };
+  });
+
+  if (repairCount > 0) {
+    console.warn(`[DATA REPAIR] Fixed ${repairCount} cars with missing/duplicate IDs`);
+  }
+
+  return repairedTracks;
+}
+
+interface AppContextType {
+  tracks: Track[];
+  currentUser: User | null;
+  settings: AppSettings;
+  appName: string;
+  siteName: string;
+  addCar: (trackId: string, car: Omit<RailCar, "id" | "status">) => void;
+  confirmCar: (trackId: string, carId: string) => void;
+  unconfirmCar: (trackId: string, carId: string) => void;
+  moveCar: (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE") => boolean;
+  setUser: (user: User) => void;
+  updateSettings: (settings: AppSettings) => void;
+  updateBranding: (appName: string, siteName: string) => void;
+  updateLastChecked: (trackId: string) => void;
+  updateTrackTimestamp: (trackId: string, field: "lastChecked" | "lastCheckClearedAt") => void;
+  addTrack: (trackName: string) => void;
+  toggleTrackEnabled: (trackId: string) => void;
+  saveTracks: (tracks: Track[]) => void;
+  commitTrackOrder: (trackId: string, orderedCarList: RailCar[]) => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [settings, setSettings] = useState<AppSettings>({ requireUnconfirmDialog: false });
+  const [appName, setAppName] = useState<string>("Rail Yard Tracker");
+  const [siteName, setSiteName] = useState<string>("GFC Rail Yard");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const loadedTracks = storage.getTracks();
+    const repairedTracks = repairTrackData(loadedTracks);
+    setTracks(repairedTracks);
+    setCurrentUser(storage.getUser());
+    setSettings(storage.getSettings());
+    setAppName(storage.getAppName());
+    setSiteName(storage.getSiteName());
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      storage.saveTracks(tracks);
+    }
+  }, [tracks, mounted]);
+
+  const addCar = (trackId: string, car: Omit<RailCar, "id" | "status">) => {
+    setTracks(prev => prev.map(track => {
+      if (track.id === trackId) {
+        const newCar: RailCar = {
+          ...car,
+          id: generateUniqueCarId(),
+          status: "pending",
+        };
+        return {
+          ...track,
+          cars: [...track.cars, newCar],
+          totalCars: track.totalCars + 1,
+        };
+      }
+      return track;
+    }));
+  };
+
+  const confirmCar = (trackId: string, carId: string) => {
+    if (!currentUser) return;
+    
+    setTracks(prev => prev.map(track => {
+      if (track.id === trackId) {
+        const updatedCars = track.cars.map(car => 
+          car.id === carId 
+            ? { 
+                ...car, 
+                status: "confirmed" as const,
+                confirmedAt: new Date().toISOString(),
+                confirmedBy: currentUser.crewId,
+              }
+            : car
+        );
+        const updatedTrack = {
+          ...track,
+          cars: updatedCars,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+
+        logDiagnostic("CONFIRM_CAR", updatedTrack);
+
+        return updatedTrack;
+      }
+      return track;
+    }));
+  };
+
+  const unconfirmCar = (trackId: string, carId: string) => {
+    setTracks(prev => prev.map(track => {
+      if (track.id === trackId) {
+        const updatedCars = track.cars.map(car => 
+          car.id === carId 
+            ? { 
+                ...car, 
+                status: "pending" as const,
+                confirmedAt: undefined,
+                confirmedBy: undefined,
+              }
+            : car
+        );
+        const updatedTrack = {
+          ...track,
+          cars: updatedCars,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+
+        logDiagnostic("UNCONFIRM_CAR", updatedTrack);
+
+        return updatedTrack;
+      }
+      return track;
+    }));
+  };
+
+  const moveCar = (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE"): boolean => {
+    if (!currentUser) return false;
+
+    const fromTrack = tracks.find(t => t.id === fromTrackId);
+    const car = fromTrack?.cars.find(c => c.id === carId);
+    
+    if (!fromTrack || !car) return false;
+
+    const toTrack = tracks.find(t => t.id === toTrackId);
+    if (!toTrack) return false;
+
+    const duplicateExists = toTrack.cars.some(c => c.carNumber === car.carNumber);
+    if (duplicateExists) return false;
+
+    const moveLog: MoveLog = {
+      id: `move-${Date.now()}`,
+      carId: car.id,
+      carNumber: car.carNumber,
+      fromTrack: fromTrack.name,
+      toTrack: toTrack.name,
+      timestamp: new Date().toISOString(),
+      crewId: currentUser.crewId,
+      reason,
+    };
+
+    const existingLogs = JSON.parse(localStorage.getItem("rail_yard_move_logs") || "[]");
+    localStorage.setItem("rail_yard_move_logs", JSON.stringify([...existingLogs, moveLog]));
+
+    setTracks(prev => prev.map(track => {
+      if (track.id === fromTrackId) {
+        const updatedCars = track.cars.filter(c => c.id !== carId);
+        return {
+          ...track,
+          cars: updatedCars,
+          totalCars: updatedCars.length,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+      }
+      
+      if (track.id === toTrackId) {
+        const placement = settings.movePlacement || "append";
+        const movedCar = { ...car, status: "pending" as const, confirmedAt: undefined, confirmedBy: undefined };
+        const updatedCars = placement === "prepend" 
+          ? [movedCar, ...track.cars]
+          : [...track.cars, movedCar];
+        
+        return {
+          ...track,
+          cars: updatedCars,
+          totalCars: updatedCars.length,
+          confirmedCars: updatedCars.filter(c => c.status === "confirmed").length,
+        };
+      }
+      
+      return track;
+    }));
+
+    return true;
+  };
+
+  const updateLastChecked = (trackId: string) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId 
+        ? { ...track, lastChecked: new Date().toISOString() }
+        : track
+    ));
+  };
+
+  const updateTrackTimestamp = (trackId: string, field: "lastChecked" | "lastCheckClearedAt") => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId 
+        ? { ...track, [field]: new Date().toISOString() }
+        : track
+    ));
+  };
+
+  const updateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    storage.saveSettings(newSettings);
+  };
+
+  const updateBranding = (newAppName: string, newSiteName: string) => {
+    setAppName(newAppName);
+    setSiteName(newSiteName);
+    storage.saveAppName(newAppName);
+    storage.saveSiteName(newSiteName);
+  };
+
+  const setUser = (user: User) => {
+    setCurrentUser(user);
+    storage.saveUser(user);
+  };
+
+  const addTrack = (trackName: string) => {
+    const newTrack: Track = {
+      id: `track-${Date.now()}`,
+      name: trackName,
+      cars: [],
+      totalCars: 0,
+      confirmedCars: 0,
+      enabled: true,
+    };
+    setTracks(prev => [...prev, newTrack]);
+  };
+
+  const toggleTrackEnabled = (trackId: string) => {
+    setTracks(prev => prev.map(track =>
+      track.id === trackId
+        ? { ...track, enabled: !track.enabled }
+        : track
+    ));
+  };
+
+  const saveTracks = (updatedTracks: Track[]) => {
+    setTracks(updatedTracks);
+  };
+
+  const commitTrackOrder = (trackId: string, orderedCarList: RailCar[]) => {
+    if (!currentUser) return;
+
+    setTracks(prev => prev.map(track => {
+      if (track.id !== trackId) return track;
+
+      const orderedIds = new Set(orderedCarList.map(c => c.id));
+      const missingCars = track.cars.filter(c => !orderedIds.has(c.id));
+
+      const finalOrder = [...orderedCarList, ...missingCars];
+
+      const orderLog = {
+        id: `order-${Date.now()}`,
+        trackId: track.id,
+        trackName: track.name,
+        timestamp: new Date().toISOString(),
+        crewId: currentUser.crewId,
+        reason: "ORDER_UPDATED",
+        carCount: finalOrder.length,
+      };
+
+      const existingLogs = JSON.parse(localStorage.getItem("rail_yard_order_logs") || "[]");
+      localStorage.setItem("rail_yard_order_logs", JSON.stringify([...existingLogs, orderLog]));
+
+      return {
+        ...track,
+        cars: finalOrder,
+      };
+    }));
+  };
+
+  return (
+    <AppContext.Provider value={{
+      tracks,
+      currentUser,
+      settings,
+      appName,
+      siteName,
+      addCar,
+      confirmCar,
+      unconfirmCar,
+      moveCar,
+      setUser,
+      updateSettings,
+      updateBranding,
+      updateLastChecked,
+      updateTrackTimestamp,
+      addTrack,
+      toggleTrackEnabled,
+      saveTracks,
+      commitTrackOrder,
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
+
+export function useApp() {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error("useApp must be used within AppProvider");
+  }
+  return context;
+}
+```
+
+---
+
+### 5. BOTTOM NAVIGATION
 
 **File:** `src/components/BottomNav.tsx`
 
@@ -454,7 +784,6 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50 pointer-events-auto">
       <div className="max-w-4xl mx-auto px-2 py-2" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
         <div className="grid grid-cols-3 gap-2">
-          {/* NAV.tabYardCheck */}
           <button
             id="NAV.tabYardCheck"
             onClick={handleYardCheck}
@@ -468,7 +797,6 @@ export function BottomNav() {
             <span className="text-xs font-medium">Yard Check</span>
           </button>
 
-          {/* NAV.tabReorder */}
           <button
             id="NAV.tabReorder"
             onClick={handleReorder}
@@ -482,7 +810,6 @@ export function BottomNav() {
             <span className="text-xs font-medium">Reorder</span>
           </button>
 
-          {/* NAV.tabSettings */}
           <button
             id="NAV.tabSettings"
             onClick={handleSettings}
@@ -504,64 +831,317 @@ export function BottomNav() {
 
 ---
 
-### 5. REORDER PAGE (FIXED)
+### 6. CAR IMPORT PARSER
 
-**File:** `src/pages/reorder/index.tsx`
+**File:** `src/lib/carImportParser.ts`
 
 ```typescript
-import { useRouter } from "next/router";
+export interface ImportBuckets {
+  toAdd: string[];
+  skipped: string[];
+  unrecognized: string[];
+}
 
-const MASTER_TRACK_LIST = [
-  "AS28", "AS29", "AS30", "AS31", "AS32", "AS33",
-  "AS34", "AS38", "AS39", "AS46", "AS47", "AS48"
-];
+export interface ExtractedCar {
+  normalized: string;
+  source: string;
+}
 
-export default function ReorderTrackSelect() {
-  const router = useRouter();
+export interface ExtractedCarData {
+  recognized: ExtractedCar[];
+  unrecognized: string[];
+}
 
-  const handleTrackSelect = (trackName: string) => {
-    router.push(`/reorder/${trackName}`);
+export function extractCarIds(rawText: string): ExtractedCarData {
+  const lines = rawText.split(/[\r\n]+/);
+  const carMap = new Map<string, string>();
+  const unrecognized: string[] = [];
+
+  const carPattern = /([A-Za-z]{2,4})[\s\-_]*(\d{3,7})/g;
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const matches = Array.from(trimmed.matchAll(carPattern));
+    
+    if (matches.length > 0) {
+      matches.forEach(match => {
+        const mark = match[1].toUpperCase();
+        const number = match[2];
+        const normalized = `${mark} ${number}`;
+        if (!carMap.has(normalized)) {
+          carMap.set(normalized, trimmed);
+        }
+      });
+    } else {
+      if (trimmed.length > 0) {
+        unrecognized.push(trimmed);
+      }
+    }
+  });
+
+  const recognized: ExtractedCar[] = Array.from(carMap.entries()).map(([normalized, source]) => ({
+    normalized,
+    source,
+  }));
+
+  return {
+    recognized,
+    unrecognized,
   };
+}
 
-  return (
-    <div className="min-h-screen bg-zinc-900 text-white pb-24">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* H.headerTitle */}
-        <h1 id="H.headerTitle" className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-          Reorder
-        </h1>
+export function computeImportBuckets(
+  incoming: ExtractedCar[],
+  existingToday: string[],
+  existingSnapshot: string[] = []
+): ImportBuckets {
+  const blocked = new Set([
+    ...existingToday.map(id => id.toUpperCase().trim()),
+    ...existingSnapshot.map(id => id.toUpperCase().trim()),
+  ]);
 
-        {/* H.subText */}
-        <p id="H.subText" className="text-zinc-400 text-base md:text-lg mb-6">
-          Choose a track to reorder cars.
-        </p>
+  const toAdd: string[] = [];
+  const skipped: string[] = [];
 
-        {/* H.trackList */}
-        <div id="H.trackList" className="space-y-3 md:space-y-4">
-          {MASTER_TRACK_LIST.map(trackName => (
-            <button
-              key={trackName}
-              onClick={() => handleTrackSelect(trackName)}
-              className="H.trackRow w-full bg-zinc-800 hover:bg-zinc-700 p-5 md:p-6 rounded-xl text-left transition-colors"
-            >
-              {/* H.trackName */}
-              <h2 className="H.trackName text-2xl md:text-3xl font-bold font-mono">
-                {trackName}
-              </h2>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  incoming.forEach(car => {
+    const normalized = car.normalized.toUpperCase().trim();
+    if (blocked.has(normalized)) {
+      skipped.push(car.normalized);
+    } else {
+      toAdd.push(car.normalized);
+      blocked.add(normalized);
+    }
+  });
+
+  return {
+    toAdd,
+    skipped,
+    unrecognized: [],
+  };
 }
 ```
 
 ---
 
-### 6. CONFIGURATION FILES
+### 7. DIAGNOSTICS SYSTEM
 
-**File:** `package.json`
+**File:** `src/lib/diagnostics.ts`
+
+```typescript
+import { Track } from "@/types";
+
+export interface TrackDiagnostic {
+  trackId: string;
+  trackName: string;
+  carsLength: number;
+  storedTotalCars: number;
+  storedConfirmedCars: number;
+  computedConfirmedCars: number;
+  mismatchFlags: {
+    totalMismatch: boolean;
+    confirmedMismatch: boolean;
+  };
+}
+
+export interface DebugLogEntry {
+  timestamp: string;
+  action: string;
+  diagnostic: TrackDiagnostic;
+  pendingConfirmations: number;
+  pendingUnconfirmations: number;
+}
+
+export function diagnoseTrackIntegrity(track: Track): TrackDiagnostic {
+  const carsLength = track.cars.length;
+  const computedConfirmedCars = track.cars.filter(c => c.status === "confirmed").length;
+  
+  const totalMismatch = track.totalCars !== carsLength;
+  const confirmedMismatch = track.confirmedCars !== computedConfirmedCars;
+
+  return {
+    trackId: track.id,
+    trackName: track.name,
+    carsLength,
+    storedTotalCars: track.totalCars,
+    storedConfirmedCars: track.confirmedCars,
+    computedConfirmedCars,
+    mismatchFlags: {
+      totalMismatch,
+      confirmedMismatch,
+    },
+  };
+}
+
+export function logDiagnostic(
+  action: string,
+  track: Track,
+  pendingConfirmations: number = 0,
+  pendingUnconfirmations: number = 0
+): void {
+  const diagnostic = diagnoseTrackIntegrity(track);
+  
+  const entry: DebugLogEntry = {
+    timestamp: new Date().toISOString(),
+    action,
+    diagnostic,
+    pendingConfirmations,
+    pendingUnconfirmations,
+  };
+
+  console.log(`[DIAGNOSTIC] ${action}`, {
+    ...entry,
+    mismatches: diagnostic.mismatchFlags.totalMismatch || diagnostic.mismatchFlags.confirmedMismatch
+      ? "⚠️ MISMATCH DETECTED"
+      : "✓ OK",
+  });
+
+  try {
+    const existingLogs = JSON.parse(localStorage.getItem("rail_yard_debug_logs") || "[]");
+    const updatedLogs = [...existingLogs, entry];
+    
+    const trimmedLogs = updatedLogs.slice(-100);
+    
+    localStorage.setItem("rail_yard_debug_logs", JSON.stringify(trimmedLogs));
+  } catch (error) {
+    console.error("[DIAGNOSTIC] Failed to persist log:", error);
+  }
+}
+
+export function getDebugLogs(): DebugLogEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem("rail_yard_debug_logs") || "[]");
+  } catch (error) {
+    console.error("[DIAGNOSTIC] Failed to read logs:", error);
+    return [];
+  }
+}
+
+export function clearDebugLogs(): void {
+  try {
+    localStorage.removeItem("rail_yard_debug_logs");
+    console.log("[DIAGNOSTIC] Debug logs cleared");
+  } catch (error) {
+    console.error("[DIAGNOSTIC] Failed to clear logs:", error);
+  }
+}
+
+export async function copyLogsToClipboard(): Promise<boolean> {
+  try {
+    const logs = getDebugLogs();
+    const formatted = JSON.stringify(logs, null, 2);
+    await navigator.clipboard.writeText(formatted);
+    return true;
+  } catch (error) {
+    console.error("[DIAGNOSTIC] Failed to copy logs:", error);
+    return false;
+  }
+}
+```
+
+---
+
+### 8. PROFILE STORAGE
+
+**File:** `src/lib/profileStorage.ts`
+
+```typescript
+export interface CrewProfile {
+  name: string;
+  crewId: string;
+  lastUsedAt: string;
+}
+
+const STORAGE_KEY = "rail_yard_profiles";
+
+export const profileStorage = {
+  getProfiles: (): CrewProfile[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) return [];
+      const profiles: CrewProfile[] = JSON.parse(data);
+      return profiles.sort((a, b) => 
+        new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime()
+      );
+    } catch (error) {
+      console.error("Failed to load profiles:", error);
+      return [];
+    }
+  },
+
+  upsertProfile: (name: string, crewId: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      const profiles = profileStorage.getProfiles();
+      const now = new Date().toISOString();
+      
+      const existingIndex = profiles.findIndex(
+        p => p.name === name && p.crewId === crewId
+      );
+
+      if (existingIndex >= 0) {
+        profiles[existingIndex].lastUsedAt = now;
+      } else {
+        profiles.push({ name, crewId, lastUsedAt: now });
+      }
+
+      const trimmed = profiles
+        .sort((a, b) => new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime())
+        .slice(0, 10);
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+    }
+  },
+
+  getMostRecent: (): CrewProfile | null => {
+    const profiles = profileStorage.getProfiles();
+    return profiles.length > 0 ? profiles[0] : null;
+  },
+};
+```
+
+---
+
+## KEY FEATURES
+
+### Core Functionality
+- Track Management: 12 default tracks (AS28-AS48)
+- Car Tracking: Add/confirm/unconfirm rail cars
+- Crew Sessions: Name + Crew ID with shift-based expiration
+- Profile Memory: Auto-suggests recent crew profiles
+- Car Import: Paste CN lists, auto-extract car IDs
+- Reorder: Tap-based car sequencing
+- Settings: Branding, shifts, track management
+
+### Data Integrity
+- Unique Car IDs: crypto.randomUUID() with fallback
+- Duplicate Detection: Prevents same car on multiple tracks
+- Data Repair: Auto-fixes missing/duplicate IDs on load
+- Diagnostics: Debug logs for troubleshooting
+
+### UX Features
+- Glove-Friendly: 44px+ touch targets
+- High Contrast: Dark theme (zinc-900 background)
+- One-Handed: Bottom navigation, minimal scrolling
+- Mobile-First: Safe area insets, responsive design
+- Offline-Ready: localStorage persistence
+
+### Recent Fixes (2025-12-16)
+- Fixed: /reorder page tap blocking (added pb-24 padding)
+- Fixed: BottomNav z-index and pointer-events
+- Fixed: Safe area insets for iOS devices
+- Fixed: Unique car ID generation + data repair
+- Fixed: Track reorder functionality
+
+---
+
+## CONFIGURATION FILES
+
+### package.json
 
 ```json
 {
@@ -632,127 +1212,47 @@ export default function ReorderTrackSelect() {
 }
 ```
 
-**File:** `tailwind.config.ts`
+### tsconfig.json
 
-```typescript
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-  darkMode: ["class"],
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-    },
+```json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  plugins: [require("tailwindcss-animate")],
-};
-
-export default config;
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
 ```
-
----
-
-## KEY FEATURES
-
-### ✅ Core Functionality
-- **Track Management**: 12 default tracks (AS28-AS48)
-- **Car Tracking**: Add/confirm/unconfirm rail cars
-- **Crew Sessions**: Name + Crew ID with shift-based expiration
-- **Profile Memory**: Auto-suggests recent crew profiles
-- **Car Import**: Paste CN lists, auto-extract car IDs
-- **Reorder**: Drag-and-drop car sequencing
-- **Settings**: Branding, shifts, track management
-
-### ✅ Data Integrity
-- **Unique Car IDs**: crypto.randomUUID() with fallback
-- **Duplicate Detection**: Prevents same car on multiple tracks
-- **Data Repair**: Auto-fixes missing/duplicate IDs on load
-- **Diagnostics**: Debug logs for troubleshooting
-
-### ✅ UX Features
-- **Glove-Friendly**: 44px+ touch targets
-- **High Contrast**: Dark theme (zinc-900 background)
-- **One-Handed**: Bottom navigation, minimal scrolling
-- **Mobile-First**: Safe area insets, responsive design
-- **Offline-Ready**: localStorage persistence
-
-### ✅ Recent Fixes (2025-12-16)
-- **✓ Fixed:** /reorder page tap blocking (added pb-24 padding)
-- **✓ Fixed:** BottomNav z-index and pointer-events
-- **✓ Fixed:** Safe area insets for iOS devices
-- **✓ Fixed:** Unique car ID generation + data repair
-- **✓ Fixed:** Track reorder functionality
 
 ---
 
 ## KNOWN LIMITATIONS
 
-1. **No Backend**: All data stored in localStorage (client-side only)
-2. **No Sync**: No multi-device or crew synchronization
-3. **No Auth**: Simple name + crew ID (no passwords)
-4. **No History Export**: Can't export move/remove logs to CSV
-5. **No Offline Indicator**: Assumes always online
+1. No Backend: All data stored in localStorage (client-side only)
+2. No Sync: No multi-device or crew synchronization
+3. No Auth: Simple name + crew ID (no passwords)
+4. No History Export: Can't export move/remove logs to CSV
+5. No Offline Indicator: Assumes always online
 
 ---
 
@@ -760,22 +1260,14 @@ export default config;
 
 ### Vercel (Recommended)
 ```bash
-# Install Vercel CLI
 npm i -g vercel
-
-# Deploy
 vercel
 ```
 
 ### Manual Build
 ```bash
-# Install dependencies
 npm install
-
-# Build production
 npm run build
-
-# Start server
 npm start
 ```
 
@@ -783,26 +1275,26 @@ npm start
 
 ## TESTING CHECKLIST
 
-### ✅ Core Workflows
-- [ ] Landing page → Enter name + crew ID → Tracks list
-- [ ] Tap track → See cars → Tap car to confirm/unconfirm
-- [ ] Add car → Enter car number + type → Appears in list
-- [ ] Import cars → Paste CN list → Review preview → Add
-- [ ] Reorder → Tap track → Drag cars to reorder → Confirm
-- [ ] Settings → Change app name, shift times, manage tracks
+### Core Workflows
+- Landing page → Enter name + crew ID → Tracks list
+- Tap track → See cars → Tap car to confirm/unconfirm
+- Add car → Enter car number + type → Appears in list
+- Import cars → Paste CN list → Review preview → Add
+- Reorder → Tap track → Drag cars to reorder → Confirm
+- Settings → Change app name, shift times, manage tracks
 
-### ✅ Mobile Testing
-- [ ] iOS Safari: Safe area insets working
-- [ ] Android Chrome: Touch targets responsive
-- [ ] Gloves: Can tap all buttons easily
-- [ ] Portrait/landscape: Layout adapts
-- [ ] Bottom nav: Always tappable, never blocked
+### Mobile Testing
+- iOS Safari: Safe area insets working
+- Android Chrome: Touch targets responsive
+- Gloves: Can tap all buttons easily
+- Portrait/landscape: Layout adapts
+- Bottom nav: Always tappable, never blocked
 
-### ✅ Data Integrity
-- [ ] Duplicate car detection working
-- [ ] Car IDs normalize correctly (TBOX 663566)
-- [ ] Shift expiration forces re-login
-- [ ] Profile history suggests recent users
+### Data Integrity
+- Duplicate car detection working
+- Car IDs normalize correctly (TBOX 663566)
+- Shift expiration forces re-login
+- Profile history suggests recent users
 
 ---
 
@@ -821,11 +1313,8 @@ npm start
 - shadcn/ui components
 - lucide-react icons
 
-**License:** Private project (no license specified)
-
 ---
 
 **END OF EXPORT**
-Generated: 2025-12-16 01:49:03 UTC
+Generated: 2025-12-16 01:51:00 UTC
 Total Files: 50+ files (core files shown above)
-```
