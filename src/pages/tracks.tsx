@@ -6,7 +6,7 @@ import { normalizeCarId } from "@/lib/carIdFormatter";
 import { User } from "@/types";
 
 export default function TrackSelect() {
-  const { tracks, updateLastChecked } = useApp();
+  const { tracks, updateLastChecked, currentUser } = useApp();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCrewEdit, setShowCrewEdit] = useState(false);

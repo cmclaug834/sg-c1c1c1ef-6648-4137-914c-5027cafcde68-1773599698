@@ -6,7 +6,7 @@ import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnos
 import type { DebugLogEntry } from "@/lib/diagnostics";
 
 export default function Settings() {
-  const { currentUser, settings, updateSettings, tracks, addTrack, toggleTrackEnabled, saveTracks, appName, siteName, updateBranding } = useApp();
+  const { currentUser, settings, updateSettings, tracks, addTrack, saveTracks, appName, siteName, updateBranding } = useApp();
   const router = useRouter();
   const [requireDialog, setRequireDialog] = useState(false);
   const [resolveOnDone, setResolveOnDone] = useState(true);
