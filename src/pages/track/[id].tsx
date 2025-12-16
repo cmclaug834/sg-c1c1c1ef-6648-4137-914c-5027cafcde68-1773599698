@@ -84,17 +84,17 @@ export default function TrackDetail() {
   const isCheckedThisShift = (car: any) => {
     if (car.status !== "confirmed") return false;
     if (!car.confirmedAt) return false;
-    if (!track.lastCheckClearedAt) return true; // No clear timestamp = treat as checked
+    if (!track.lastCheckClearedAt) return true;
     return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
   };
 
-  // NEW: Get shift status icon
+  // NEW: Get shift status icon (small indicator - LEFT side)
   const getShiftStatusIcon = (car: any) => {
     if (car.status === "missing") {
       return <AlertTriangle className="w-6 h-6 md:w-7 md:h-7 text-yellow-500" />;
     }
     
-    if (isCheckedThisShift(car)) {
+    if (car.status === "confirmed") {
       return <BadgeCheck className="w-6 h-6 md:w-7 md:h-7 text-green-500" />;
     }
     
@@ -357,7 +357,6 @@ export default function TrackDetail() {
   const handleYardCheckCompleted = () => {
     if (!track) return;
 
-    // Log diagnostic at start of Done
     logDiagnostic(
       "DONE_COMMIT_START",
       track,
@@ -370,7 +369,6 @@ export default function TrackDetail() {
       confirmCar(track.id, carId);
     });
 
-    // Log after confirmations applied
     logDiagnostic(
       "DONE_AFTER_CONFIRMATIONS",
       track,
@@ -383,7 +381,6 @@ export default function TrackDetail() {
       unconfirmCar(track.id, carId);
     });
 
-    // Log after unconfirmations applied
     logDiagnostic(
       "DONE_AFTER_UNCONFIRMATIONS",
       track,
@@ -397,30 +394,23 @@ export default function TrackDetail() {
     // NEW: Clear check icons by setting lastCheckClearedAt
     updateTrackTimestamp(track.id, "lastCheckClearedAt");
 
-    // Log after updateLastChecked
-    const updatedTrack = tracks.find(t => t.id === track.id);
-    if (updatedTrack) {
-      logDiagnostic(
-        "DONE_AFTER_LAST_CHECKED",
-        updatedTrack,
-        0,
-        0
-      );
-    }
+    logDiagnostic(
+      "DONE_AFTER_LAST_CHECKED",
+      tracks.find(t => t.id === track.id) || track,
+      0,
+      0
+    );
 
-    // Clear pending changes
+    // Clear pending changes (this resets large circles to grey)
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
 
-    // Log final state
-    if (updatedTrack) {
-      logDiagnostic(
-        "DONE_COMMIT_END",
-        updatedTrack,
-        0,
-        0
-      );
-    }
+    logDiagnostic(
+      "DONE_COMMIT_END",
+      tracks.find(t => t.id === track.id) || track,
+      0,
+      0
+    );
 
     // Show success toast
     setCommitToast(`Yard check saved for ${track.name}`);
@@ -499,11 +489,11 @@ export default function TrackDetail() {
             <div className="flex items-center justify-around text-xs md:text-sm">
               <div className="flex items-center gap-2">
                 <BadgeCheck className="w-4 h-4 text-green-500" />
-                <span className="text-zinc-400">Checked this shift</span>
+                <span className="text-zinc-400">Confirmed</span>
               </div>
               <div className="flex items-center gap-2">
                 <CircleDashed className="w-4 h-4 text-zinc-600" />
-                <span className="text-zinc-400">Not checked</span>
+                <span className="text-zinc-400">Not confirmed</span>
               </div>
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-yellow-500" />
@@ -523,7 +513,7 @@ export default function TrackDetail() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span>Not checked only</span>
+                <span>Not confirmed only</span>
                 <div className={`w-12 h-7 rounded-full transition-colors relative ${
                   showUnconfirmedOnly ? "bg-yellow-800" : "bg-zinc-700"
                 }`}>
@@ -556,7 +546,7 @@ export default function TrackDetail() {
           {filteredCars.length === 0 ? (
             <div className="text-center py-12 text-zinc-500">
               <p className="text-xl md:text-2xl mb-2">
-                {showUnconfirmedOnly ? "All cars checked this shift!" : "No cars on this track"}
+                {showUnconfirmedOnly ? "All cars confirmed!" : "No cars on this track"}
               </p>
               {!showUnconfirmedOnly && (
                 <p className="text-base md:text-lg">Tap + to add a car</p>
@@ -568,7 +558,6 @@ export default function TrackDetail() {
                 const effectiveStatus = getEffectiveStatus(car.id, car.status);
                 const isPending = pendingConfirmations.has(car.id) || pendingUnconfirmations.has(car.id);
                 const isSelected = selectedCarIds.has(car.id);
-                const checkedThisShift = isCheckedThisShift(car);
 
                 return (
                   <div
@@ -584,12 +573,12 @@ export default function TrackDetail() {
                         className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-4">
-                          {/* Shift Status Icon (left side) */}
+                          {/* Small Status Icon (LEFT) - Shows persistent stored state */}
                           <div className="flex-shrink-0">
                             {getShiftStatusIcon(car)}
                           </div>
 
-                          {/* Selection checkbox or Confirm state checkbox */}
+                          {/* Selection checkbox or Large Confirm Circle (MIDDLE) */}
                           {selectionMode && (
                             <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
                               isSelected
@@ -604,7 +593,7 @@ export default function TrackDetail() {
                             </div>
                           )}
 
-                          {/* Confirm state checkbox (only when not in selection mode) */}
+                          {/* Large Confirm Circle (MIDDLE) - Shows temporary session state */}
                           {!selectionMode && (
                             <div className="B.confirmStateIcon flex-shrink-0">
                               {car.status === "missing" ? (
@@ -636,7 +625,6 @@ export default function TrackDetail() {
                               </div>
                             )}
 
-                            {/* Keep "Confirmed by" text */}
                             {!isPending && car.status === "confirmed" && car.confirmedAt && (
                               <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
                                 Confirmed {formatConfirmedTime(car.confirmedAt)}
