@@ -3,6 +3,54 @@ import { Track, User, RailCar, AppSettings, MoveLog } from "@/types";
 import { storage } from "@/lib/storage";
 import { logDiagnostic } from "@/lib/diagnostics";
 
+/**
+ * Generate a unique car ID
+ * Uses crypto.randomUUID() if available, otherwise Date.now() + random suffix
+ */
+function generateUniqueCarId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `car-${crypto.randomUUID()}`;
+  }
+  // Fallback: Date.now() + random suffix to avoid collisions
+  return `car-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Repair track data: ensure all cars have unique IDs
+ * Returns repaired tracks and logs any fixes made
+ */
+function repairTrackData(tracks: Track[]): Track[] {
+  let repairCount = 0;
+  const usedIds = new Set<string>();
+
+  const repairedTracks = tracks.map(track => {
+    const repairedCars = track.cars.map(car => {
+      // Check if car is missing ID or has duplicate ID
+      if (!car.id || usedIds.has(car.id)) {
+        const oldId = car.id || "(missing)";
+        const newId = generateUniqueCarId();
+        repairCount++;
+        console.warn(`[DATA REPAIR] Track ${track.name}: Fixed car ${car.carNumber} - ID ${oldId} → ${newId}`);
+        usedIds.add(newId);
+        return { ...car, id: newId };
+      }
+      usedIds.add(car.id);
+      return car;
+    });
+
+    return {
+      ...track,
+      cars: repairedCars,
+    };
+  });
+
+  if (repairCount > 0) {
+    console.warn(`[DATA REPAIR] Fixed ${repairCount} cars with missing/duplicate IDs`);
+  }
+
+  return repairedTracks;
+}
+
 interface AppContextType {
   tracks: Track[];
   currentUser: User | null;
@@ -35,7 +83,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    setTracks(storage.getTracks());
+    const loadedTracks = storage.getTracks();
+    const repairedTracks = repairTrackData(loadedTracks);
+    setTracks(repairedTracks);
     setCurrentUser(storage.getUser());
     setSettings(storage.getSettings());
     setAppName(storage.getAppName());
@@ -53,7 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (track.id === trackId) {
         const newCar: RailCar = {
           ...car,
-          id: `car-${Date.now()}`,
+          id: generateUniqueCarId(),
           status: "pending",
         };
         return {
