@@ -3,6 +3,54 @@ import { useRouter } from "next/router";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { profileStorage, CrewProfile } from "@/lib/profileStorage";
+import { storage } from "@/lib/storage";
+
+/**
+ * Compute next shift change timestamp
+ * Given current time and two daily shift times (HH:MM format),
+ * returns the next upcoming shift change as ISO timestamp
+ */
+function computeNextShiftChange(shiftA: string, shiftB: string): string {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  
+  // Parse shift times into Date objects for today
+  const shiftATime = new Date(`${today}T${shiftA}:00`);
+  const shiftBTime = new Date(`${today}T${shiftB}:00`);
+  
+  // Find next upcoming shift
+  const shifts = [shiftATime, shiftBTime].sort((a, b) => a.getTime() - b.getTime());
+  
+  for (const shift of shifts) {
+    if (shift > now) {
+      return shift.toISOString();
+    }
+  }
+  
+  // All shifts today have passed, use first shift tomorrow
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDate = tomorrow.toISOString().split("T")[0];
+  const firstShiftTomorrow = new Date(`${tomorrowDate}T${shifts[0].toTimeString().slice(0, 5)}:00`);
+  
+  return firstShiftTomorrow.toISOString();
+}
+
+/**
+ * Check if crew session is still valid
+ * Returns true if active crew exists and session hasn't expired
+ */
+function isSessionValid(): boolean {
+  const activeCrew = storage.getActiveCrew();
+  const expiresAt = storage.getSessionExpiresAt();
+  
+  if (!activeCrew || !expiresAt) return false;
+  
+  const now = new Date();
+  const expires = new Date(expiresAt);
+  
+  return now < expires;
+}
 
 export default function FrontPage() {
   const { setUser, siteName } = useApp();
@@ -17,6 +65,25 @@ export default function FrontPage() {
 
   useEffect(() => {
     setMounted(true);
+    
+    // Check if session is still valid
+    if (isSessionValid()) {
+      // Session valid, bypass landing page and go to tracks
+      const activeCrew = storage.getActiveCrew();
+      if (activeCrew) {
+        // Restore user in context
+        setUser({
+          id: `user-${Date.now()}`,
+          name: activeCrew.name,
+          crewId: activeCrew.crewId,
+        });
+        // Navigate to tracks
+        router.push("/tracks");
+        return;
+      }
+    }
+    
+    // Session expired or no active crew, show landing page
     const loadedProfiles = profileStorage.getProfiles();
     setProfiles(loadedProfiles);
     
@@ -26,7 +93,7 @@ export default function FrontPage() {
       setName(mostRecent.name);
       setCrewId(mostRecent.crewId);
     }
-  }, []);
+  }, [router, setUser]);
 
   if (!mounted) {
     return null;
@@ -47,12 +114,24 @@ export default function FrontPage() {
     // Save/update profile
     profileStorage.upsertProfile(name.trim(), crewId.trim());
 
-    // Set user in context (same as Settings used to do)
+    // Set user in context
     setUser({
       id: `user-${Date.now()}`,
       name: name.trim(),
       crewId: crewId.trim(),
     });
+
+    // Save active crew session
+    storage.saveActiveCrew({
+      name: name.trim(),
+      crewId: crewId.trim(),
+      startedAt: new Date().toISOString(),
+    });
+
+    // Compute next shift change and save expiration
+    const { shiftA, shiftB } = storage.getShiftTimes();
+    const nextShiftChange = computeNextShiftChange(shiftA, shiftB);
+    storage.saveSessionExpiresAt(nextShiftChange);
 
     // Navigate to track list
     router.push("/tracks");

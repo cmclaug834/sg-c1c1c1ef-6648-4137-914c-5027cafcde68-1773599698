@@ -230,7 +230,7 @@ export default function TrackDetail() {
     if (hasPendingChanges) {
       setShowDiscardDialog(true);
     } else {
-      router.push("/");
+      router.push("/tracks");
     }
   };
 
@@ -239,7 +239,7 @@ export default function TrackDetail() {
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
     setShowDiscardDialog(false);
-    router.push("/");
+    router.push("/tracks");
   };
 
   // NEW: Commit all pending changes
@@ -311,9 +311,9 @@ export default function TrackDetail() {
     // Show success toast
     setCommitToast(`Yard check saved for ${track.name}`);
 
-    // Navigate back after short delay
+    // Navigate to track list after short delay
     setTimeout(() => {
-      router.push("/");
+      router.push("/tracks");
     }, 1500);
   };
 

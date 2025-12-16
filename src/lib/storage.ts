@@ -6,7 +6,17 @@ const STORAGE_KEYS = {
   SETTINGS: "rail_yard_settings",
   APP_NAME: "rail_yard_app_name",
   SITE_NAME: "rail_yard_site_name",
+  ACTIVE_CREW: "rail_yard_active_crew",
+  SESSION_EXPIRES_AT: "rail_yard_session_expires_at",
+  SHIFT_A: "rail_yard_shift_a",
+  SHIFT_B: "rail_yard_shift_b",
 };
+
+export interface ActiveCrew {
+  name: string;
+  crewId: string;
+  startedAt: string;
+}
 
 export const storage = {
   getTracks: (): Track[] => {
@@ -37,7 +47,9 @@ export const storage = {
       resolveOnDone: true,
       showMissingInList: false,
       movePlacement: "append",
-      adminManageTracks: false
+      adminManageTracks: false,
+      shiftChangeA: "06:00",
+      shiftChangeB: "18:00",
     };
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     return data ? JSON.parse(data) : { 
@@ -45,7 +57,9 @@ export const storage = {
       resolveOnDone: true,
       showMissingInList: false,
       movePlacement: "append",
-      adminManageTracks: false
+      adminManageTracks: false,
+      shiftChangeA: "06:00",
+      shiftChangeB: "18:00",
     };
   },
 
@@ -74,6 +88,46 @@ export const storage = {
   saveSiteName: (name: string) => {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.SITE_NAME, name);
+  },
+
+  getActiveCrew: (): ActiveCrew | null => {
+    if (typeof window === "undefined") return null;
+    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_CREW);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveActiveCrew: (crew: ActiveCrew) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_CREW, JSON.stringify(crew));
+  },
+
+  clearActiveCrew: () => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_CREW);
+    localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
+  },
+
+  getSessionExpiresAt: (): string | null => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
+  },
+
+  saveSessionExpiresAt: (timestamp: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SESSION_EXPIRES_AT, timestamp);
+  },
+
+  getShiftTimes: (): { shiftA: string; shiftB: string } => {
+    if (typeof window === "undefined") return { shiftA: "06:00", shiftB: "18:00" };
+    const shiftA = localStorage.getItem(STORAGE_KEYS.SHIFT_A) || "06:00";
+    const shiftB = localStorage.getItem(STORAGE_KEYS.SHIFT_B) || "18:00";
+    return { shiftA, shiftB };
+  },
+
+  saveShiftTimes: (shiftA: string, shiftB: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SHIFT_A, shiftA);
+    localStorage.setItem(STORAGE_KEYS.SHIFT_B, shiftB);
   },
 };
 

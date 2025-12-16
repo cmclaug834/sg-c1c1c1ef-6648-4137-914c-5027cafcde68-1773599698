@@ -40,4 +40,6 @@ export interface AppSettings {
   showMissingInList?: boolean;
   movePlacement?: "append" | "prepend";
   adminManageTracks?: boolean;
+  shiftChangeA?: string;
+  shiftChangeB?: string;
 }

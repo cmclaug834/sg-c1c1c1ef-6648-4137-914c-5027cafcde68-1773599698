@@ -28,6 +28,9 @@ export default function Settings() {
   const [showClearDataDialog, setShowClearDataDialog] = useState(false);
   const [clearDataToast, setClearDataToast] = useState<string | null>(null);
 
+  const [shiftChangeA, setShiftChangeA] = useState("06:00");
+  const [shiftChangeB, setShiftChangeB] = useState("18:00");
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -42,6 +45,8 @@ export default function Settings() {
       setLocalTracks(tracks);
       setLocalAppName(appName);
       setLocalSiteName(siteName);
+      setShiftChangeA(settings.shiftChangeA ?? "06:00");
+      setShiftChangeB(settings.shiftChangeB ?? "18:00");
     }
   }, [mounted, settings, tracks, appName, siteName]);
 
@@ -87,6 +92,16 @@ export default function Settings() {
       ...settings,
       adminManageTracks: newValue
     });
+  };
+
+  const handleSaveShiftTimes = () => {
+    updateSettings({
+      ...settings,
+      shiftChangeA,
+      shiftChangeB,
+    });
+    setTrackValidation("Shift times saved successfully");
+    setTimeout(() => setTrackValidation(""), 2000);
   };
 
   const validateTrackName = (input: string): boolean => {
@@ -357,6 +372,48 @@ export default function Settings() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* D.sectionShift - NEW SECTION */}
+        <div id="D.sectionShift" className="mt-12 pt-8 border-t border-zinc-800">
+          <h2 className="text-2xl font-bold mb-6">Shift Changes</h2>
+
+          <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
+            <p className="text-zinc-400 text-base mb-4">
+              Set the times when crew sessions expire and require re-confirmation at the landing page.
+            </p>
+
+            {/* D.shiftAField */}
+            <div id="D.shiftAField">
+              <label className="block text-zinc-400 mb-2 text-base">Shift A Time</label>
+              <input
+                type="time"
+                value={shiftChangeA}
+                onChange={(e) => setShiftChangeA(e.target.value)}
+                className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none font-mono"
+              />
+            </div>
+
+            {/* D.shiftBField */}
+            <div id="D.shiftBField">
+              <label className="block text-zinc-400 mb-2 text-base">Shift B Time</label>
+              <input
+                type="time"
+                value={shiftChangeB}
+                onChange={(e) => setShiftChangeB(e.target.value)}
+                className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none font-mono"
+              />
+            </div>
+
+            {/* D.saveShiftTimesBtn */}
+            <button
+              id="D.saveShiftTimesBtn"
+              onClick={handleSaveShiftTimes}
+              className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
+            >
+              Save Shift Times
+            </button>
           </div>
         </div>
 
