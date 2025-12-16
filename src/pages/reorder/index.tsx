@@ -13,7 +13,7 @@ export default function ReorderTrackSelect() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
+    <div className="min-h-screen bg-zinc-900 text-white pb-24">
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* H.headerTitle */}
         <h1 id="H.headerTitle" className="text-3xl md:text-4xl font-bold tracking-tight mb-2">

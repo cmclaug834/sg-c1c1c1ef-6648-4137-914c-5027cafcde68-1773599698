@@ -22,8 +22,8 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50">
-      <div className="max-w-4xl mx-auto px-2 py-2 pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50 pointer-events-auto">
+      <div className="max-w-4xl mx-auto px-2 py-2" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
         <div className="grid grid-cols-3 gap-2">
           {/* NAV.tabYardCheck */}
           <button
