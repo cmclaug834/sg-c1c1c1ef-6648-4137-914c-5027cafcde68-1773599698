@@ -25,6 +25,9 @@ export default function Settings() {
   const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
   const [copySuccess, setCopySuccess] = useState(false);
 
+  const [showClearDataDialog, setShowClearDataDialog] = useState(false);
+  const [clearDataToast, setClearDataToast] = useState<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -146,6 +149,37 @@ export default function Settings() {
     const success = await copyLogsToClipboard();
     setCopySuccess(success);
     setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const handleClearLocalData = () => {
+    // Clear all localStorage keys used by the app
+    const keysToRemove = [
+      "rail_yard_tracks",
+      "rail_yard_user",
+      "rail_yard_settings",
+      "rail_yard_app_name",
+      "rail_yard_site_name",
+      "rail_yard_profiles",
+      "rail_yard_debug_logs",
+      "rail_yard_move_logs",
+      "rail_yard_remove_logs",
+      "rail_yard_order_logs",
+    ];
+
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+
+    // Close dialog
+    setShowClearDataDialog(false);
+
+    // Show success toast
+    setClearDataToast("Local data cleared");
+
+    // Navigate to Front Page after short delay
+    setTimeout(() => {
+      router.push("/");
+    }, 1500);
   };
 
   return (
@@ -450,6 +484,26 @@ export default function Settings() {
             Clear Debug Logs
           </button>
         </div>
+
+        {/* NEW: Data Management Section */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
+          <h2 className="text-2xl font-bold mb-6">Data Management</h2>
+
+          <div className="bg-zinc-800 p-5 rounded-xl">
+            <p className="text-zinc-400 text-base mb-4">
+              Clear all local data stored on this device. This includes tracks, crew profiles, settings, and history.
+            </p>
+
+            {/* D.clearLocalDataBtn */}
+            <button
+              id="D.clearLocalDataBtn"
+              onClick={() => setShowClearDataDialog(true)}
+              className="w-full py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+            >
+              Clear Local Data
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Debug Logs Modal */}
@@ -557,6 +611,54 @@ export default function Settings() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Clear Local Data Confirmation Dialog */}
+      {showClearDataDialog && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            {/* D.clearDataDialogTitle */}
+            <h2 id="D.clearDataDialogTitle" className="text-2xl font-bold mb-4">
+              Clear all local data?
+            </h2>
+
+            {/* D.clearDataDialogBody */}
+            <p id="D.clearDataDialogBody" className="text-zinc-400 text-lg mb-2">
+              This will erase saved tracks, crew profiles, settings, and history from this device.
+            </p>
+            
+            <p className="text-red-400 text-base mb-6 font-semibold">
+              This cannot be undone.
+            </p>
+
+            <div className="flex gap-3">
+              {/* D.clearDataCancelBtn */}
+              <button
+                id="D.clearDataCancelBtn"
+                onClick={() => setShowClearDataDialog(false)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+
+              {/* D.clearDataConfirmBtn */}
+              <button
+                id="D.clearDataConfirmBtn"
+                onClick={handleClearLocalData}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Yes, Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Data Success Toast */}
+      {clearDataToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-zinc-700">
+          <p className="text-base md:text-lg font-medium">{clearDataToast}</p>
         </div>
       )}
     </div>
