@@ -16,9 +16,9 @@ const MASTER_TRACK_LIST = [
 export function TrackPickerModal({ onSelectTrack, onCancel, excludeTrackId, title }: TrackPickerModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredTracks = MASTER_TRACK_LIST.filter(trackName =>
-    trackName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTracks = MASTER_TRACK_LIST
+    .filter(trackName => trackName !== excludeTrackId)
+    .filter(trackName => trackName.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">

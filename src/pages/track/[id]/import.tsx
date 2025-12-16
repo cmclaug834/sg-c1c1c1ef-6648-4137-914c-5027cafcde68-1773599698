@@ -1,6 +1,9 @@
+ 
+// TODO: Wire up duplicate handling workflows (currently simplified to add-new-only)
+
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useState, useRef } from "react";
 import { extractCarIds, computeImportBuckets } from "@/lib/carImportParser";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -20,13 +23,19 @@ export default function ImportCars() {
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [importToast, setImportToast] = useState<string | null>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-  const [showDuplicateReview, setShowDuplicateReview] = useState(false);
-  const [selectedDuplicates, setSelectedDuplicates] = useState<Set<string>>(new Set());
   const willAddSectionRef = useRef<HTMLDivElement>(null);
 
-  const track = tracks.find(t => t.id === id);
+  // Safe guard for missing id
+  if (!id || Array.isArray(id)) {
+    return (
+      <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
+        <p className="text-xl text-zinc-400">Invalid track ID</p>
+      </div>
+    );
+  }
+
+  const trackId = String(id);
+  const track = tracks.find(t => t.id === trackId);
 
   if (!track) {
     return (
@@ -40,7 +49,7 @@ export default function ImportCars() {
     const { recognized, unrecognized } = extractCarIds(pasteText);
 
     // Normalize existing car numbers for comparison
-    const existingToday = track?.cars.map(car => normalizeCarId(car.carNumber)) || [];
+    const existingToday = track.cars.map(car => normalizeCarId(car.carNumber));
 
     const existingSnapshot: string[] = [];
 
@@ -70,7 +79,7 @@ export default function ImportCars() {
   };
 
   const handleCancel = () => {
-    router.push(`/track/${id}`);
+    router.push(`/track/${trackId}`);
   };
 
   const handleAddCars = () => {
@@ -78,44 +87,22 @@ export default function ImportCars() {
 
     // Add all cars from toAdd list
     preview.toAdd.forEach(car => {
-      addCar(track!.id, {
+      addCar(track.id, {
         carNumber: car.normalized,
         carType: "BOX", // Default type, user can edit later
       });
     });
 
-    setImportToast(`Added ${preview.toAdd.length} cars to ${track!.name}`);
+    setImportToast(`Added ${preview.toAdd.length} cars to ${track.name}`);
 
     // Return to track detail after short delay
     setTimeout(() => {
-      router.push(`/track/${id}`);
+      router.push(`/track/${trackId}`);
     }, 2000);
   };
 
   const handleBackToEdit = () => {
     setPreview(null);
-  };
-
-  const executeImport = (carsToAdd: string[]) => {
-    carsToAdd.forEach(carNumber => {
-      // Normalize before adding (defense in depth)
-      const normalized = normalizeCarId(carNumber);
-      addCar(track!.id, {
-        carNumber: normalized,
-        carType: "BOX",
-      });
-    });
-
-    const skippedCount = preview!.skipped.length - selectedDuplicates.size;
-    const message = skippedCount > 0 
-      ? `Added ${carsToAdd.length} cars. Skipped ${skippedCount} duplicates.`
-      : `Added ${carsToAdd.length} cars.`;
-    
-    setImportToast(message);
-
-    setTimeout(() => {
-      router.push(`/track/${id}`);
-    }, 2000);
   };
 
   return (
@@ -258,7 +245,7 @@ export default function ImportCars() {
                 )}
               </div>
 
-              {/* Inline Action Row - Fix A */}
+              {/* Inline Action Row */}
               <div className="bg-zinc-800 rounded-xl p-5">
                 <div className="flex gap-3">
                   {/* I.inlineBackToEditBtn */}
@@ -290,7 +277,7 @@ export default function ImportCars() {
         </div>
       </div>
 
-      {/* Sticky Bottom Action Bar - Fix B: Hardened */}
+      {/* Sticky Bottom Action Bar */}
       {preview && (
         <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="max-w-4xl mx-auto p-4">

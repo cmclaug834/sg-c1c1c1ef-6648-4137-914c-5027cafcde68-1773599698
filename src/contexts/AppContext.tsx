@@ -5,6 +5,14 @@ import { logDiagnostic } from "@/lib/diagnostics";
 import { normalizeCarId } from "@/lib/carIdFormatter";
 
 /**
+ * Legacy track type that may have stored count fields
+ */
+interface LegacyTrack extends Track {
+  totalCars?: number;
+  confirmedCars?: number;
+}
+
+/**
  * Generate a unique car ID
  * Uses crypto.randomUUID() if available, otherwise Date.now() + random suffix
  */
@@ -61,7 +69,7 @@ function repairTrackData(tracks: Track[]): Track[] {
     };
 
     // Check if legacy counts existed and were wrong
-    const legacyTrack = track as any;
+    const legacyTrack = track as LegacyTrack;
     if (legacyTrack.totalCars !== undefined || legacyTrack.confirmedCars !== undefined) {
       const actualTotal = repairedCars.length;
       const actualConfirmed = repairedCars.filter(c => c.status === "confirmed").length;
@@ -200,7 +208,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
 
         // Log diagnostic after confirm
-        logDiagnostic("CONFIRM_CAR", { ...updatedTrack, ...computeTrackCounts(updatedCars) } as any);
+        logDiagnostic("CONFIRM_CAR", updatedTrack as LegacyTrack, 0, 0);
 
         return updatedTrack;
       }
@@ -228,7 +236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
 
         // Log diagnostic after unconfirm
-        logDiagnostic("UNCONFIRM_CAR", { ...updatedTrack, ...computeTrackCounts(updatedCars) } as any);
+        logDiagnostic("UNCONFIRM_CAR", updatedTrack as LegacyTrack, 0, 0);
 
         return updatedTrack;
       }

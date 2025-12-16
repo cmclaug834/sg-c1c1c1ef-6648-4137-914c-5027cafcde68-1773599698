@@ -12,13 +12,13 @@
 
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, Plus, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, Upload, BadgeCheck, CircleDashed } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, BadgeCheck, CircleDashed } from "lucide-react";
 import { useState, useEffect } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
-import { TrackPickerModal } from "@/components/TrackPickerModal";
 import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
 import { logDiagnostic } from "@/lib/diagnostics";
+import { RailCar } from "@/types";
 
 export default function TrackDetail() {
   const { tracks, confirmCar, unconfirmCar, settings, moveCar, currentUser, updateLastChecked, updateTrackTimestamp, saveTracks } = useApp();
@@ -70,7 +70,7 @@ export default function TrackDetail() {
   const hasPendingChanges = pendingConfirmations.size > 0 || pendingUnconfirmations.size > 0;
 
   // Determine if car was checked this shift (for filtering)
-  const isCheckedThisShift = (car: any) => {
+  const isCheckedThisShift = (car: RailCar) => {
     if (car.status !== "confirmed") return false;
     if (!car.confirmedAt) return false;
     if (!track.lastCheckClearedAt) return true;
@@ -78,7 +78,7 @@ export default function TrackDetail() {
   };
 
   // SMALL left status icon - PERSISTENT STATE (uses car.status)
-  const getSmallStatusIcon = (car: any) => {
+  const getSmallStatusIcon = (car: RailCar) => {
     if (car.status === "missing") {
       return <AlertTriangle className="w-6 h-6 md:w-7 md:h-7 text-yellow-500" />;
     }

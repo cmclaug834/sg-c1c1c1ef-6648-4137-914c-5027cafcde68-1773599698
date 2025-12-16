@@ -26,7 +26,7 @@ export function DuplicateCarDialog({
         {/* Y.dialogBody */}
         <div id="Y.dialogBody" className="text-zinc-400 text-lg mb-6">
           <p className="mb-2">
-            This car already exists on: <span className="font-mono font-semibold text-white">{existingTrackName}</span>
+            Car <span className="font-mono font-semibold text-white">{carNumber}</span> already exists on: <span className="font-mono font-semibold text-white">{existingTrackName}</span>
           </p>
           <p>What would you like to do?</p>
         </div>

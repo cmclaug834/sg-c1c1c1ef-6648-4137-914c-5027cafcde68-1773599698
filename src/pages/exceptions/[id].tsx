@@ -16,7 +16,6 @@ export default function ExceptionsReview() {
 
   const track = tracks.find(t => t.id === id);
   const unconfirmedCars = track?.cars.filter(car => car.status === "pending") || [];
-  const otherTracks = tracks.filter(t => t.id !== id);
 
   if (!track) {
     return (
@@ -45,20 +44,18 @@ export default function ExceptionsReview() {
     setSelectedCars(new Set());
   };
 
-  const moveToTrack = (targetTrackId: string) => {
-    const targetTrack = tracks.find(t => t.id === targetTrackId);
-    if (!targetTrack) return;
-
+  const handleMoveToTrack = (targetTrackId: string, targetTrackName: string) => {
     const newResolutions = { ...resolutions };
     selectedCars.forEach(carId => {
       newResolutions[carId] = { 
         type: "move", 
         targetTrackId: targetTrackId,
-        targetTrackName: targetTrack.name 
+        targetTrackName: targetTrackName 
       };
     });
     setResolutions(newResolutions);
     setSelectedCars(new Set());
+    setShowTrackPicker(false);
   };
 
   const clearResolution = (carId: string) => {
@@ -242,19 +239,7 @@ export default function ExceptionsReview() {
       {/* Track Picker Modal */}
       {showTrackPicker && (
         <TrackPickerModal
-          onSelectTrack={(targetTrackId, targetTrackName) => {
-            const newResolutions = { ...resolutions };
-            selectedCars.forEach(carId => {
-              newResolutions[carId] = { 
-                type: "move", 
-                targetTrackId: targetTrackId,
-                targetTrackName: targetTrackName 
-              };
-            });
-            setResolutions(newResolutions);
-            setSelectedCars(new Set());
-            setShowTrackPicker(false);
-          }}
+          onSelectTrack={handleMoveToTrack}
           onCancel={() => setShowTrackPicker(false)}
           excludeTrackId={track?.id}
           title="Move to which track?"

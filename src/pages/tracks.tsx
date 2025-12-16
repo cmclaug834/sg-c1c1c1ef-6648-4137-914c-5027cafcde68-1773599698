@@ -3,9 +3,10 @@ import { useRouter } from "next/router";
 import { CheckCircle2, Circle, Clock, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { normalizeCarId } from "@/lib/carIdFormatter";
+import { User } from "@/types";
 
 export default function TrackSelect() {
-  const { tracks, currentUser, updateLastChecked } = useApp();
+  const { tracks, updateLastChecked } = useApp();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCrewEdit, setShowCrewEdit] = useState(false);
@@ -336,7 +337,6 @@ export default function TrackSelect() {
       {/* Crew Edit Modal */}
       {showCrewEdit && (
         <CrewEditModal
-          currentUser={currentUser}
           onClose={() => setShowCrewEdit(false)}
         />
       )}
@@ -344,8 +344,11 @@ export default function TrackSelect() {
   );
 }
 
-function CrewEditModal({ currentUser, onClose }: { currentUser: any; onClose: () => void }) {
-  const { setUser } = useApp();
+interface CrewEditModalProps {
+  onClose: () => void;
+}
+
+function CrewEditModal({ onClose }: CrewEditModalProps) {
   const router = useRouter();
 
   return (
