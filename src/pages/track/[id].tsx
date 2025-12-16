@@ -584,12 +584,12 @@ export default function TrackDetail() {
                         className="flex-1 p-5 md:p-6 text-left hover:bg-zinc-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-4">
-                          {/* NEW: Shift Status Icon (left side) */}
+                          {/* Shift Status Icon (left side) */}
                           <div className="flex-shrink-0">
                             {getShiftStatusIcon(car)}
                           </div>
 
-                          {/* Existing checkbox or selection checkbox */}
+                          {/* Selection checkbox or Confirm state checkbox */}
                           {selectionMode && (
                             <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
                               isSelected
@@ -604,15 +604,19 @@ export default function TrackDetail() {
                             </div>
                           )}
 
-                          {/* Existing confirm state checkbox (only when not in selection mode) */}
+                          {/* Confirm state checkbox (only when not in selection mode) */}
                           {!selectionMode && (
                             <div className="B.confirmStateIcon flex-shrink-0">
-                              {effectiveStatus === "confirmed" && checkedThisShift ? (
-                                <CheckCircle2 className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-green-500'}`} />
-                              ) : car.status === "missing" ? (
+                              {car.status === "missing" ? (
                                 <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
+                              ) : pendingConfirmations.has(car.id) ? (
+                                <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
+                              ) : pendingUnconfirmations.has(car.id) ? (
+                                <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
+                              ) : effectiveStatus === "confirmed" ? (
+                                <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
                               ) : (
-                                <Circle className={`w-8 h-8 md:w-10 md:h-10 ${isPending ? 'text-yellow-500' : 'text-zinc-600'}`} />
+                                <Circle className="w-8 h-8 md:w-10 md:h-10 text-zinc-600" />
                               )}
                             </div>
                           )}
@@ -628,7 +632,7 @@ export default function TrackDetail() {
 
                             {isPending && (
                               <div className="text-yellow-500 text-sm md:text-base">
-                                Pending: {effectiveStatus === "confirmed" ? "will confirm" : "will unconfirm"}
+                                Pending: {pendingConfirmations.has(car.id) ? "will confirm" : "will unconfirm"}
                               </div>
                             )}
 
