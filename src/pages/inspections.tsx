@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import { Search, Clock, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
-import { Inspection } from "@/types/inspection";
+import { Inspection, InspectionStatus } from "@/types/inspection";
 import { useApp } from "@/contexts/AppContext";
 
 type Tab = "templates" | "inspections";
