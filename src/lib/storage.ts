@@ -25,7 +25,17 @@ export const storage = {
       const data = localStorage.getItem(STORAGE_KEYS.TRACKS);
       if (!data) return getInitialTracks();
       const parsed = JSON.parse(data);
-      return Array.isArray(parsed) ? parsed : getInitialTracks();
+      
+      // Return tracks as-is from localStorage, only applying defaults for missing optional fields
+      if (Array.isArray(parsed)) {
+        return parsed.map(track => ({
+          ...track,
+          // Only apply defaults if fields are missing
+          enabled: track.enabled !== undefined ? track.enabled : true,
+        }));
+      }
+      
+      return getInitialTracks();
     } catch (error) {
       console.warn("[Storage] Failed to parse tracks, returning defaults:", error);
       return getInitialTracks();
@@ -35,6 +45,7 @@ export const storage = {
   saveTracks: (tracks: Track[]) => {
     if (typeof window === "undefined") return;
     try {
+      // Save complete Track objects without any transformation
       localStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(tracks));
     } catch (error) {
       console.error("[Storage] Failed to save tracks:", error);
