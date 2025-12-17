@@ -1,6 +1,7 @@
 import { Inspection } from "@/types/inspection";
 
 const STORAGE_KEY = "gp_inspections_v1";
+const APPROVED_STORAGE_KEY = "gp_approved_inspections_v1";
 
 /**
  * Migrate old inspection format to new dual signature format
@@ -20,10 +21,16 @@ function migrateInspection(inspection: any): Inspection {
       },
       // Remove old field
       inspectorSignature: undefined,
+      // Add reviewStatus default
+      reviewStatus: inspection.reviewStatus || "pending",
     };
   }
   
-  return inspection;
+  // Ensure reviewStatus exists
+  return {
+    ...inspection,
+    reviewStatus: inspection.reviewStatus || "pending",
+  };
 }
 
 export const inspectionStorage = {
@@ -61,6 +68,7 @@ export const inspectionStorage = {
       id: `inspection-${Date.now()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      reviewStatus: "pending",
     };
     
     const inspections = inspectionStorage.getInspections();
@@ -82,6 +90,11 @@ export const inspectionStorage = {
       updatedAt: new Date().toISOString(),
     };
     
+    // If marking as complete, set completedAt
+    if (updates.status === "complete" && !inspections[index].completedAt) {
+      inspections[index].completedAt = new Date().toISOString();
+    }
+    
     inspectionStorage.saveInspections(inspections);
   },
 
@@ -89,5 +102,63 @@ export const inspectionStorage = {
     const inspections = inspectionStorage.getInspections();
     const filtered = inspections.filter(i => i.id !== id);
     inspectionStorage.saveInspections(filtered);
+  },
+
+  // Approved inspections (archive)
+  getApprovedInspections: (): Inspection[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const data = localStorage.getItem(APPROVED_STORAGE_KEY);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch (error) {
+      console.error("[InspectionStorage] Failed to parse approved inspections:", error);
+      return [];
+    }
+  },
+
+  saveApprovedInspections: (inspections: Inspection[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(APPROVED_STORAGE_KEY, JSON.stringify(inspections));
+    } catch (error) {
+      console.error("[InspectionStorage] Failed to save approved inspections:", error);
+    }
+  },
+
+  approveInspection: (id: string) => {
+    const inspections = inspectionStorage.getInspections();
+    const inspection = inspections.find(i => i.id === id);
+    
+    if (!inspection) return;
+    
+    // Mark as approved
+    inspection.reviewStatus = "approved";
+    inspection.updatedAt = new Date().toISOString();
+    
+    // Move to approved archive
+    const approved = inspectionStorage.getApprovedInspections();
+    approved.push(inspection);
+    inspectionStorage.saveApprovedInspections(approved);
+    
+    // Remove from active inspections
+    inspectionStorage.deleteInspection(id);
+  },
+
+  rejectInspection: (id: string, managerNote: string) => {
+    const inspections = inspectionStorage.getInspections();
+    const index = inspections.findIndex(i => i.id === id);
+    
+    if (index === -1) return;
+    
+    inspections[index] = {
+      ...inspections[index],
+      reviewStatus: "rejected",
+      status: "in_progress", // Send back to in-progress
+      managerNote,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    inspectionStorage.saveInspections(inspections);
   },
 };

@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { Search, Clock, CheckCircle2 } from "lucide-react";
+import { Search, Clock, CheckCircle2, Settings } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection, InspectionStatus } from "@/types/inspection";
@@ -30,7 +30,11 @@ export default function InspectionsHome() {
   useEffect(() => {
     if (mounted) {
       const loadedInspections = inspectionStorage.getInspections();
-      setInspections(loadedInspections);
+      // Filter out approved inspections from the main list
+      const activeInspections = loadedInspections.filter(
+        i => i.reviewStatus !== "approved"
+      );
+      setInspections(activeInspections);
     }
   }, [mounted]);
 
@@ -85,14 +89,20 @@ export default function InspectionsHome() {
     return <Clock className="w-5 h-5 text-yellow-500" />;
   };
 
-  const getStatusText = (status: InspectionStatus) => {
-    if (status === "complete") return "Complete";
+  const getStatusText = (status: InspectionStatus, reviewStatus?: string) => {
+    if (status === "complete") {
+      if (reviewStatus === "rejected") return "Needs Fix";
+      return "Pending Review";
+    }
     if (status === "in_progress") return "In Progress";
     return "Draft";
   };
 
-  const getStatusColor = (status: InspectionStatus) => {
-    if (status === "complete") return "bg-green-600/20 text-green-500 border-green-600/50";
+  const getStatusColor = (status: InspectionStatus, reviewStatus?: string) => {
+    if (status === "complete") {
+      if (reviewStatus === "rejected") return "bg-red-600/20 text-red-500 border-red-600/50";
+      return "bg-yellow-600/20 text-yellow-500 border-yellow-600/50";
+    }
     return "bg-yellow-600/20 text-yellow-500 border-yellow-600/50";
   };
 
@@ -150,11 +160,9 @@ export default function InspectionsHome() {
           </div>
           
           {/* Status Pill */}
-          <div className="flex-shrink-0">
-            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(inspection.status)}`}>
-              {getStatusText(inspection.status)}
-            </span>
-          </div>
+          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(inspection.status, inspection.reviewStatus)}`}>
+            {getStatusText(inspection.status, inspection.reviewStatus)}
+          </span>
         </div>
       </button>
     );
@@ -165,9 +173,20 @@ export default function InspectionsHome() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            Inspections
-          </h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Inspections
+            </h1>
+            
+            {/* Admin Button */}
+            <button
+              onClick={() => router.push("/inspections/admin")}
+              className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+              aria-label="Inspection Admin"
+            >
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
 
           {/* Search Bar */}
           <div className="relative">

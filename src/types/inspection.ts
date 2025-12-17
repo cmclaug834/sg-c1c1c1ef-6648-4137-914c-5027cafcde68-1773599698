@@ -1,18 +1,21 @@
 export type InspectionStatus = "draft" | "in_progress" | "complete";
+export type ReviewStatus = "pending" | "approved" | "rejected";
 
 export interface Inspection {
   id: string;
   templateId: "gp-rail-car-inspection-v1";
   status: InspectionStatus;
+  reviewStatus?: ReviewStatus;
   
   createdAt: string;
   updatedAt: string;
+  completedAt?: string;
   
-  // Title Page fields (NEW STRUCTURE)
-  houseCode?: string;         // H2-1, H2-2, etc.
-  carNumber?: string;         // CN555555, etc.
-  site?: string;              // GP, CCF, etc.
-  startedAt: string;          // ISO timestamp
+  // Title Page fields
+  houseCode?: string;
+  carNumber?: string;
+  site?: string;
+  startedAt: string;
   
   // Legacy fields (keep for backwards compatibility)
   siteConducted?: string;
@@ -26,7 +29,7 @@ export interface Inspection {
   
   // Page 2 - Final Inspection
   isLoadBalanced?: "yes" | "no";
-  loadNo?: string;            // Load number (collected on Page 2)
+  loadNo?: string;
   
   // Media (photos)
   media: {
@@ -51,10 +54,23 @@ export interface Inspection {
     };
   };
   
+  // Manager review
+  managerNote?: string;
+  
   // Legacy signature support (backwards compatibility)
   inspectorSignature?: {
     fullName?: string;
     signatureDataUrl?: string;
     signedAt?: string;
   };
+}
+
+export interface InspectionFormConfig {
+  sections: {
+    id: string;
+    label: string;
+    enabled: boolean;
+    required: boolean;
+    order: number;
+  }[];
 }
