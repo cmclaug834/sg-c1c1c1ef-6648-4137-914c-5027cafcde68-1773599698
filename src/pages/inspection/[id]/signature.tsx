@@ -7,7 +7,7 @@ import { useApp } from "@/contexts/AppContext";
 
 export default function SignaturePage() {
   const router = useRouter();
-  const { inspectionId, type, returnTo, scrollY } = router.query;
+  const { id, type, returnTo, scrollY } = router.query;
   const { currentUser } = useApp();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,17 +30,17 @@ export default function SignaturePage() {
       return;
     }
     
-    if (typeof inspectionId === "string") {
-      const loaded = inspectionStorage.getInspection(inspectionId);
+    if (typeof id === "string") {
+      const loaded = inspectionStorage.getInspection(id);
       if (loaded) {
         setInspection(loaded);
       }
     }
-  }, [mounted, inspectionId, currentUser, router]);
+  }, [mounted, id, currentUser, router]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !mounted) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -70,10 +70,30 @@ export default function SignaturePage() {
     ctx.font = "14px system-ui";
     ctx.textAlign = "center";
     ctx.fillText("Sign above the dotted line", rect.width / 2, rect.height - 40);
-  }, [mounted]);
+  }, [mounted, canvasRef.current]);
 
-  if (!mounted || !currentUser || !inspection) {
+  if (!mounted) {
     return null;
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl">Please log in first</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!inspection) {
+    return (
+      <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl">Loading inspection...</p>
+        </div>
+      </div>
+    );
   }
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
