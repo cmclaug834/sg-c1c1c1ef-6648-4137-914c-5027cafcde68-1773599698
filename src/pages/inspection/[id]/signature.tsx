@@ -51,26 +51,13 @@ export default function SignaturePage() {
     canvas.height = rect.height * 2;
     ctx.scale(2, 2);
 
-    // White background
+    // White background only - no lines or text
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw dotted line
-    ctx.strokeStyle = "#CBD5E1";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
+    
+    // Reset path state to prevent stray lines
     ctx.beginPath();
-    ctx.moveTo(20, rect.height - 60);
-    ctx.lineTo(rect.width - 20, rect.height - 60);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw text
-    ctx.fillStyle = "#64748B";
-    ctx.font = "14px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("Sign above the dotted line", rect.width / 2, rect.height - 40);
-  }, [mounted, canvasRef.current]);
+  }, [mounted]);
 
   if (!mounted) {
     return null;
@@ -96,6 +83,27 @@ export default function SignaturePage() {
     );
   }
 
+  const getCoordinates = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+    canvas: HTMLCanvasElement
+  ) => {
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+
+    if ("touches" in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -103,22 +111,14 @@ export default function SignaturePage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    setIsDrawing(true);
-    setHasDrawn(true);
+    const { x, y } = getCoordinates(e, canvas);
 
-    const rect = canvas.getBoundingClientRect();
-    let x, y;
-
-    if ("touches" in e) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    }
-
+    // Start a new path - this prevents connecting to any previous points
     ctx.beginPath();
     ctx.moveTo(x, y);
+    
+    setIsDrawing(true);
+    setHasDrawn(true);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -130,27 +130,30 @@ export default function SignaturePage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    let x, y;
+    const { x, y } = getCoordinates(e, canvas);
 
-    if ("touches" in e) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    }
-
+    // Set drawing style
     ctx.strokeStyle = "#000000";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    
+    // Draw line to current position
     ctx.lineTo(x, y);
     ctx.stroke();
   };
 
   const stopDrawing = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     setIsDrawing(false);
+    
+    // Close the current path to prepare for next stroke
+    ctx.closePath();
   };
 
   const clearSignature = () => {
@@ -160,29 +163,16 @@ export default function SignaturePage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-
-    // Clear and redraw background
+    // Clear canvas
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Redraw dotted line
-    ctx.strokeStyle = "#CBD5E1";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.beginPath();
-    ctx.moveTo(20, rect.height - 60);
-    ctx.lineTo(rect.width - 20, rect.height - 60);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Redraw text
-    ctx.fillStyle = "#64748B";
-    ctx.font = "14px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("Sign above the dotted line", rect.width / 2, rect.height - 40);
-    
+    // Reset drawing state
+    setIsDrawing(false);
     setHasDrawn(false);
+    
+    // Start fresh path state to prevent stray lines
+    ctx.beginPath();
   };
 
   const saveSignature = () => {
@@ -260,20 +250,31 @@ export default function SignaturePage() {
           </button>
         </div>
 
-        {/* Canvas */}
-        <div className="bg-white rounded-lg p-4 mb-6">
-          <canvas
-            ref={canvasRef}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onTouchStart={startDrawing}
-            onTouchMove={draw}
-            onTouchEnd={stopDrawing}
-            className="w-full h-64 touch-none cursor-crosshair"
-            style={{ touchAction: "none" }}
-          />
+        {/* Canvas Container with Overlay */}
+        <div className="bg-white rounded-lg p-4 mb-6 relative">
+          <div className="relative w-full h-64">
+            {/* Signature Canvas */}
+            <canvas
+              ref={canvasRef}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className="w-full h-full touch-none cursor-crosshair absolute inset-0"
+              style={{ touchAction: "none" }}
+            />
+            
+            {/* Baseline Overlay (HTML - not drawn on canvas) */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute bottom-12 left-5 right-5 border-t-2 border-dashed border-slate-300" />
+              <div className="absolute bottom-6 left-0 right-0 text-center text-sm text-slate-500">
+                Sign above the dotted line
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Clear Button */}
