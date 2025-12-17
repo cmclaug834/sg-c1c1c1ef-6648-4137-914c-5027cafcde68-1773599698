@@ -1,7 +1,7 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { ArrowRight, ChevronDown } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { profileStorage, CrewProfile } from "@/lib/profileStorage";
 import { storage } from "@/lib/storage";
 import { User } from "@/types";
@@ -63,21 +63,31 @@ export default function FrontPage() {
   const [showNameDropdown, setShowNameDropdown] = useState(false);
   const [showCrewDropdown, setShowCrewDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
+  
+  // Use ref to track if navigation has been initiated
+  const hasNavigated = useRef(false);
 
   useEffect(() => {
     setMounted(true);
+    
+    // Only check session once on mount
+    if (hasNavigated.current) return;
     
     // Check if session is still valid
     if (isSessionValid()) {
       // Session valid, bypass landing page and go to tracks
       const activeCrew = storage.getActiveCrew();
       if (activeCrew) {
+        // Mark navigation as initiated
+        hasNavigated.current = true;
+        
         // Restore user in context
         setUser({
           id: `user-${Date.now()}`,
           name: activeCrew.name,
           crewId: activeCrew.crewId,
         });
+        
         // Navigate to tracks after a tick to avoid iframe security issues
         setTimeout(() => {
           router.push("/tracks");
@@ -96,9 +106,10 @@ export default function FrontPage() {
       setName(mostRecent.name);
       setCrewId(mostRecent.crewId);
     }
-  }, [router, setUser]);
+  }, []); // Only run once on mount
 
-  if (!mounted) {
+  // Prevent rendering if navigating
+  if (!mounted || hasNavigated.current) {
     return null;
   }
 
@@ -113,6 +124,10 @@ export default function FrontPage() {
     if (!name.trim() || !crewId.trim()) {
       return;
     }
+
+    // Prevent multiple submissions
+    if (hasNavigated.current) return;
+    hasNavigated.current = true;
 
     // Save/update profile
     profileStorage.upsertProfile(name.trim(), crewId.trim());
@@ -277,9 +292,9 @@ export default function FrontPage() {
           id="FRONT.startBtn"
           type="button"
           onClick={handleStartYardCheck}
-          disabled={!isValid}
+          disabled={!isValid || hasNavigated.current}
           className={`w-full py-5 rounded-xl text-xl font-bold transition-colors flex items-center justify-center gap-3 ${
-            isValid
+            isValid && !hasNavigated.current
               ? "bg-green-600 hover:bg-green-700"
               : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
           }`}

@@ -1,9 +1,7 @@
  
-// TODO: Wire up duplicate handling workflows (currently simplified to add-new-only)
-
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { useState, useRef } from "react";
 import { extractCarIds, computeImportBuckets } from "@/lib/carImportParser";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -13,6 +11,7 @@ interface PreviewData {
   toAdd: ExtractedCar[];
   skipped: string[];
   unrecognized: string[];
+  tankCount: number;
 }
 
 export default function ImportCars() {
@@ -59,10 +58,14 @@ export default function ImportCars() {
       buckets.toAdd.includes(car.normalized)
     );
 
+    // Count tank cars that need type confirmation
+    const tankCount = toAddWithSource.filter(car => car.detectedType === "TANK").length;
+
     setPreview({
       toAdd: toAddWithSource,
       skipped: buckets.skipped,
       unrecognized,
+      tankCount,
     });
 
     setTimeout(() => {
@@ -85,24 +88,36 @@ export default function ImportCars() {
   const handleAddCars = () => {
     if (!preview || preview.toAdd.length === 0) return;
 
-    // Add all cars from toAdd list
+    // Add all cars from toAdd list with detected types
     preview.toAdd.forEach(car => {
       addCar(track.id, {
         carNumber: car.normalized,
-        carType: "BOX", // Default type, user can edit later
+        carType: car.detectedType || "BOX",
+        tankType: car.detectedType === "TANK" ? undefined : undefined,
       });
     });
 
-    setImportToast(`Added ${preview.toAdd.length} cars to ${track.name}`);
+    const tankWarning = preview.tankCount > 0 
+      ? ` ⚠️ ${preview.tankCount} tank ${preview.tankCount === 1 ? 'car' : 'cars'} require type confirmation during yard check.`
+      : "";
 
-    // Return to track detail after short delay
+    setImportToast(`Added ${preview.toAdd.length} cars to ${track.name}.${tankWarning}`);
+
+    // Return to track detail after delay
     setTimeout(() => {
       router.push(`/track/${trackId}`);
-    }, 2000);
+    }, 3000);
   };
 
   const handleBackToEdit = () => {
     setPreview(null);
+  };
+
+  const getCarTypeBadge = (car: ExtractedCar) => {
+    if (car.detectedType === "TANK") {
+      return "TANK — (?)";
+    }
+    return car.detectedType || "BOX";
   };
 
   return (
@@ -137,8 +152,18 @@ export default function ImportCars() {
 
           {/* I.subText */}
           <p id="I.subText" className="text-zinc-400 text-base md:text-lg mb-4">
-            Paste the CN car list below. We'll extract car IDs and add only new cars.
+            Paste car list from CN. Existing cars will be skipped.
           </p>
+
+          {/* Tank Warning Banner */}
+          {!preview && (
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 mb-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-zinc-400">
+                Tank cars will be imported with unknown type and must be confirmed during yard check.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -147,13 +172,13 @@ export default function ImportCars() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           {/* I.pasteTextArea */}
           <div className="mb-6">
-            <label className="block text-zinc-400 mb-2 text-lg">Paste CN List</label>
+            <label className="block text-zinc-400 mb-2 text-lg">Paste Car List</label>
             <textarea
               id="I.pasteTextArea"
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
-              placeholder="TBOX 663566&#10;GBRX 123456&#10;BNSF789012&#10;..."
-              className="w-full bg-zinc-800 text-white text-base md:text-lg px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none font-mono min-h-48 resize-y"
+              placeholder="Paste car list here…&#10;Example:&#10;TBOX663566&#10;DTTX401992&#10;UTLX302144"
+              className="w-full bg-zinc-800 text-white text-base md:text-lg px-4 py-4 rounded-lg border-2 border-dashed border-zinc-700 focus:border-zinc-600 focus:outline-none font-mono min-h-48 resize-y"
             />
           </div>
 
@@ -186,6 +211,21 @@ export default function ImportCars() {
           {/* Preview Results */}
           {preview && (
             <div className="space-y-4">
+              {/* Tank Warning Summary */}
+              {preview.tankCount > 0 && (
+                <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-lg p-4 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-yellow-400 font-medium">
+                      {preview.tankCount} tank {preview.tankCount === 1 ? 'car' : 'cars'} detected
+                    </p>
+                    <p className="text-sm text-yellow-500/80 mt-1">
+                      Tank type can be assigned during yard check.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* I.willAddSection */}
               <div id="I.willAddSection" ref={willAddSectionRef} className="bg-zinc-800 rounded-xl p-5">
                 <h3 className="text-xl font-bold text-green-400 mb-3">
@@ -198,9 +238,24 @@ export default function ImportCars() {
                     {preview.toAdd.map((car, idx) => (
                       <div
                         key={idx}
-                        className="bg-zinc-900 p-3 rounded-lg"
+                        className="bg-zinc-900 p-3 rounded-lg flex items-center justify-between"
                       >
-                        <span className="font-mono text-lg">{car.normalized}</span>
+                        <div className="flex items-center gap-3">
+                          {car.detectedType === "TANK" && (
+                            <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                          )}
+                          <div>
+                            <span className="font-mono text-lg block">{car.normalized}</span>
+                            <span className="text-sm text-zinc-500">{car.detectedType || "BOX"}</span>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          car.detectedType === "TANK"
+                            ? "bg-yellow-600/20 text-yellow-400"
+                            : "bg-zinc-700 text-zinc-400"
+                        }`}>
+                          {getCarTypeBadge(car)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -254,7 +309,7 @@ export default function ImportCars() {
                     onClick={handleBackToEdit}
                     className="flex-1 py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-lg font-medium transition-colors"
                   >
-                    Back to Edit
+                    Discard Import
                   </button>
 
                   {/* I.inlineAddCarsBtn */}
@@ -268,7 +323,7 @@ export default function ImportCars() {
                         : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
                     }`}
                   >
-                    Add Cars
+                    Confirm Import
                   </button>
                 </div>
               </div>
@@ -288,7 +343,7 @@ export default function ImportCars() {
                 onClick={handleBackToEdit}
                 className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
               >
-                Back to Edit
+                Discard Import
               </button>
 
               {/* I.addCarsBtn */}
@@ -302,7 +357,7 @@ export default function ImportCars() {
                     : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
                 }`}
               >
-                Add Cars
+                Confirm Import
               </button>
             </div>
           </div>
@@ -311,7 +366,7 @@ export default function ImportCars() {
 
       {/* I.importToast */}
       {importToast && (
-        <div id="I.importToast" className="fixed top-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-zinc-700">
+        <div id="I.importToast" className="fixed top-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-zinc-700 max-w-md">
           <p className="text-base md:text-lg font-medium">{importToast}</p>
         </div>
       )}

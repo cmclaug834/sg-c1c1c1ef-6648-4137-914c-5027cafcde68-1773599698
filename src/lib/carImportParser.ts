@@ -12,11 +12,37 @@ export interface ImportBuckets {
 export interface ExtractedCar {
   normalized: string;
   source: string;
+  detectedType?: "BOX" | "TANK" | "FLAT";
 }
 
 export interface ExtractedCarData {
   recognized: ExtractedCar[];
   unrecognized: string[];
+}
+
+/**
+ * Detect car type from reporting mark
+ * Common tank car marks: UTLX, TILX, NATX, GATX, SHPX, ACFX, PROCX, etc.
+ * Common box car marks: TBOX, ATSF, BN, UP, CN, CP, etc.
+ * Common flat car marks: DTTX, TTX, RTTX, BNSF, UP, etc.
+ */
+function detectCarType(reportingMark: string): "BOX" | "TANK" | "FLAT" {
+  const mark = reportingMark.toUpperCase();
+  
+  // Tank car indicators (usually have X suffix or known tank operators)
+  const tankIndicators = ["UTLX", "TILX", "NATX", "GATX", "SHPX", "ACFX", "PROCX", "DOWX", "UNPX", "ADMX"];
+  if (tankIndicators.some(t => mark.startsWith(t))) {
+    return "TANK";
+  }
+  
+  // Flat car indicators (intermodal, spine, well cars)
+  const flatIndicators = ["DTTX", "TTX", "RTTX", "ITTX"];
+  if (flatIndicators.some(f => mark.startsWith(f))) {
+    return "FLAT";
+  }
+  
+  // Default to BOX for general freight cars
+  return "BOX";
 }
 
 /**
@@ -26,7 +52,7 @@ export interface ExtractedCarData {
  */
 export function extractCarIds(rawText: string): ExtractedCarData {
   const lines = rawText.split(/[\r\n]+/);
-  const carMap = new Map<string, string>(); // normalized -> source
+  const carMap = new Map<string, { source: string; reportingMark: string }>();
   const unrecognized: string[] = [];
 
   // Regex to match reporting mark (2-4 letters) + number (3-7 digits)
@@ -47,7 +73,7 @@ export function extractCarIds(rawText: string): ExtractedCarData {
         const normalized = `${mark} ${number}`;
         // Store first occurrence of each normalized ID with its source line
         if (!carMap.has(normalized)) {
-          carMap.set(normalized, trimmed);
+          carMap.set(normalized, { source: trimmed, reportingMark: mark });
         }
       });
     } else {
@@ -58,9 +84,10 @@ export function extractCarIds(rawText: string): ExtractedCarData {
     }
   });
 
-  const recognized: ExtractedCar[] = Array.from(carMap.entries()).map(([normalized, source]) => ({
+  const recognized: ExtractedCar[] = Array.from(carMap.entries()).map(([normalized, data]) => ({
     normalized,
-    source,
+    source: data.source,
+    detectedType: detectCarType(data.reportingMark),
   }));
 
   return {
