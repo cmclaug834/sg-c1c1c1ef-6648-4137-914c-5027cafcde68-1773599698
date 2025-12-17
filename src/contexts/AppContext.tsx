@@ -173,6 +173,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (mounted) {
+      // Save complete tracks array without any transformation
+      // This preserves all fields including optional ones like displayName
       storage.saveTracks(tracks);
     }
   }, [tracks, mounted]);
