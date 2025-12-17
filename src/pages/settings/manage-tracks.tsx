@@ -177,7 +177,7 @@ export default function ManageTracks() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white pb-24">
+    <div className="min-h-screen bg-zinc-900 text-white">
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -297,12 +297,12 @@ export default function ManageTracks() {
         {!showAddForm ? (
           <button
             onClick={() => setShowAddForm(true)}
-            className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+            className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors mb-6"
           >
             + Add Track
           </button>
         ) : (
-          <div className="bg-zinc-800 p-5 rounded-xl border border-zinc-700">
+          <div className="bg-zinc-800 p-5 rounded-xl border border-zinc-700 mb-6">
             <h3 className="text-lg font-bold mb-4">New Track</h3>
             
             <div className="space-y-4">
@@ -367,19 +367,13 @@ export default function ManageTracks() {
           </div>
         )}
 
-        {validation && validation.includes("successfully") && (
-          <p className="mt-4 text-green-500 text-center">{validation}</p>
-        )}
-      </div>
-
-      {/* Sticky Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4">
-        <div className="max-w-2xl mx-auto flex gap-3">
+        {/* Save/Discard Buttons - Now visible below Add Track */}
+        <div className="flex gap-3 mb-6">
           <button
             onClick={handleCancel}
             className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
           >
-            Cancel
+            Discard Changes
           </button>
           <button
             onClick={handleSaveChanges}
@@ -393,6 +387,10 @@ export default function ManageTracks() {
             Save Changes
           </button>
         </div>
+
+        {validation && validation.includes("successfully") && (
+          <p className="text-green-500 text-center text-lg">{validation}</p>
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}
