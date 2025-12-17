@@ -8,12 +8,17 @@ export interface Inspection {
   createdAt: string;
   updatedAt: string;
   
-  // Title Page fields
+  // Title Page fields (NEW STRUCTURE)
+  houseCode?: string;         // H2-1, H2-2, etc.
+  carNumber?: string;         // CN555555, etc.
+  site?: string;              // GP, CCF, etc.
+  startedAt: string;          // ISO timestamp
+  
+  // Legacy fields (keep for backwards compatibility)
   siteConducted?: string;
   dateTime?: string;
   houseNumber?: string;
   vehicleId?: string;
-  loadNo?: string;  // Keep for backwards compatibility, but collect on Page 2 going forward
   
   // Page 1 - Accept/Reject
   acceptReject?: "yes" | "no";
@@ -21,8 +26,9 @@ export interface Inspection {
   
   // Page 2 - Final Inspection
   isLoadBalanced?: "yes" | "no";
+  loadNo?: string;            // Load number (collected on Page 2)
   
-  // Media placeholders
+  // Media (photos)
   media: {
     doorwayExteriorAndInterior?: string[];
     doorwayBeforeClosing?: string[];

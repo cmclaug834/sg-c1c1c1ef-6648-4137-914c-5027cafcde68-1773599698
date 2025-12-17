@@ -38,10 +38,30 @@ export default function InspectionsHome() {
     return null;
   }
 
-  const inProgressInspections = inspections.filter(
-    i => i.status === "draft" || i.status === "in_progress"
-  );
-  const completeInspections = inspections.filter(i => i.status === "complete");
+  // Filter inspections by search query
+  const searchLower = searchQuery.toLowerCase().trim();
+  const filteredInspections = inspections.filter(inspection => {
+    if (!searchQuery.trim()) return true;
+    
+    const houseCode = inspection.houseCode || inspection.houseNumber || "";
+    const carNumber = inspection.carNumber || inspection.vehicleId || "";
+    const site = inspection.site || inspection.siteConducted || "";
+    
+    return (
+      houseCode.toLowerCase().includes(searchLower) ||
+      carNumber.toLowerCase().includes(searchLower) ||
+      site.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Separate and sort inspections
+  const inProgressInspections = filteredInspections
+    .filter(i => i.status === "draft" || i.status === "in_progress")
+    .sort((a, b) => new Date(b.startedAt || b.createdAt).getTime() - new Date(a.startedAt || a.createdAt).getTime());
+  
+  const completeInspections = filteredInspections
+    .filter(i => i.status === "complete")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const handleStartInspection = () => {
     setShowTemplateSheet(false);
@@ -50,7 +70,7 @@ export default function InspectionsHome() {
 
   const handleInspectionClick = (inspection: Inspection) => {
     if (inspection.status === "complete") {
-      // View completed inspection (for now, just go to page 1)
+      // View completed inspection
       router.push(`/inspection/${inspection.id}/page/1`);
     } else {
       // Continue draft/in-progress inspection
@@ -71,6 +91,75 @@ export default function InspectionsHome() {
     return "Draft";
   };
 
+  const getStatusColor = (status: InspectionStatus) => {
+    if (status === "complete") return "bg-green-600/20 text-green-500 border-green-600/50";
+    return "bg-yellow-600/20 text-yellow-500 border-yellow-600/50";
+  };
+
+  const formatDate = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const formatTimestamp = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const renderInspectionCard = (inspection: Inspection) => {
+    const houseCode = inspection.houseCode || inspection.houseNumber || "—";
+    const carNumber = inspection.carNumber || inspection.vehicleId || "—";
+    const site = inspection.site || inspection.siteConducted || "—";
+    const startedAt = inspection.startedAt || inspection.createdAt;
+    const dateStr = formatDate(startedAt);
+
+    return (
+      <button
+        key={inspection.id}
+        onClick={() => handleInspectionClick(inspection)}
+        className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 mt-1">
+            {getStatusIcon(inspection.status)}
+          </div>
+          <div className="flex-1 min-w-0">
+            {/* Title Line: H2-1 / CN555555 / Dec 17, 2025 */}
+            <div className="text-lg font-bold mb-2 font-mono">
+              {houseCode} / {carNumber} / {dateStr}
+            </div>
+            
+            {/* Secondary Lines */}
+            <div className="text-zinc-400 text-sm space-y-1">
+              <div>Site: <span className="font-medium">{site}</span></div>
+              <div className="text-zinc-500">
+                Started: {formatTimestamp(startedAt)}
+              </div>
+            </div>
+          </div>
+          
+          {/* Status Pill */}
+          <div className="flex-shrink-0">
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(inspection.status)}`}>
+              {getStatusText(inspection.status)}
+            </span>
+          </div>
+        </div>
+      </button>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-zinc-900 text-white pb-20">
       <div className="max-w-4xl mx-auto px-4 py-6">
@@ -87,7 +176,7 @@ export default function InspectionsHome() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search inspections..."
+              placeholder="Search by house, car number, or site..."
               className="w-full bg-zinc-800 text-white pl-12 pr-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-zinc-600 focus:outline-none text-base md:text-lg"
             />
           </div>
@@ -151,9 +240,13 @@ export default function InspectionsHome() {
           <div className="space-y-4">
             {inProgressInspections.length === 0 && completeInspections.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-xl text-zinc-400">No inspections yet</p>
+                <p className="text-xl text-zinc-400">
+                  {searchQuery.trim() ? "No inspections found" : "No inspections yet"}
+                </p>
                 <p className="text-sm text-zinc-500 mt-2">
-                  Start an inspection from the Templates tab
+                  {searchQuery.trim() 
+                    ? "Try a different search term" 
+                    : "Start an inspection from the Templates tab"}
                 </p>
               </div>
             ) : (
@@ -165,40 +258,7 @@ export default function InspectionsHome() {
                       In Progress ({inProgressInspections.length})
                     </h3>
                     <div className="space-y-3">
-                      {inProgressInspections.map((inspection) => (
-                        <button
-                          key={inspection.id}
-                          onClick={() => handleInspectionClick(inspection)}
-                          className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
-                        >
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 mt-1">
-                              {getStatusIcon(inspection.status)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-lg font-bold mb-1">
-                                Rail Car Inspection
-                              </div>
-                              <div className="text-zinc-400 text-sm space-y-1">
-                                {inspection.vehicleId && (
-                                  <div>Vehicle: {inspection.vehicleId}</div>
-                                )}
-                                {inspection.siteConducted && (
-                                  <div>Site: {inspection.siteConducted}</div>
-                                )}
-                                <div className="text-zinc-500">
-                                  Started: {new Date(inspection.createdAt).toLocaleString()}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex-shrink-0">
-                              <span className="text-sm text-yellow-500 font-medium">
-                                {getStatusText(inspection.status)}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                      {inProgressInspections.map(renderInspectionCard)}
                     </div>
                   </div>
                 )}
@@ -210,40 +270,7 @@ export default function InspectionsHome() {
                       Complete ({completeInspections.length})
                     </h3>
                     <div className="space-y-3">
-                      {completeInspections.map((inspection) => (
-                        <button
-                          key={inspection.id}
-                          onClick={() => handleInspectionClick(inspection)}
-                          className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
-                        >
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 mt-1">
-                              {getStatusIcon(inspection.status)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-lg font-bold mb-1">
-                                Rail Car Inspection
-                              </div>
-                              <div className="text-zinc-400 text-sm space-y-1">
-                                {inspection.vehicleId && (
-                                  <div>Vehicle: {inspection.vehicleId}</div>
-                                )}
-                                {inspection.siteConducted && (
-                                  <div>Site: {inspection.siteConducted}</div>
-                                )}
-                                <div className="text-zinc-500">
-                                  Completed: {new Date(inspection.updatedAt).toLocaleString()}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex-shrink-0">
-                              <span className="text-sm text-green-500 font-medium">
-                                {getStatusText(inspection.status)}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                      {completeInspections.map(renderInspectionCard)}
                     </div>
                   </div>
                 )}

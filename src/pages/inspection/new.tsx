@@ -12,11 +12,11 @@ export default function NewInspection() {
   const { currentUser } = useApp();
   const [mounted, setMounted] = useState(false);
   
-  // Form State (Load No removed)
-  const [siteConducted, setSiteConducted] = useState("");
+  // Form State (NEW STRUCTURE)
+  const [site, setSite] = useState("");
+  const [houseCode, setHouseCode] = useState("");
+  const [carNumber, setCarNumber] = useState("");
   const [dateTime, setDateTime] = useState("");
-  const [houseNumber, setHouseNumber] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
   
   // Sheet State
   const [showSiteSheet, setShowSiteSheet] = useState(false);
@@ -39,20 +39,31 @@ export default function NewInspection() {
   if (!mounted || !currentUser) return null;
 
   const handleNext = () => {
-    // Create the inspection record (without Load No)
+    // Create the inspection record with NEW structure
     const newInspection = inspectionStorage.createInspection({
       templateId: "gp-rail-car-inspection-v1",
       status: "draft",
-      siteConducted,
+      
+      // NEW FIELDS
+      houseCode,
+      carNumber,
+      site,
+      startedAt: new Date().toISOString(),
+      
+      // Keep legacy fields for backwards compatibility
+      siteConducted: site,
       dateTime,
-      houseNumber,
-      vehicleId,
+      houseNumber: houseCode,
+      vehicleId: carNumber,
+      
       media: {},
     });
 
     // Navigate to Page 1
     router.push(`/inspection/${newInspection.id}/page/1`);
   };
+
+  const canProceed = site && carNumber;
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white pb-20">
@@ -74,20 +85,58 @@ export default function NewInspection() {
         {/* Form Fields */}
         <div className="space-y-6">
           
-          {/* Site Conducted */}
+          {/* Site */}
           <div>
             <label className="block text-zinc-400 text-sm mb-2">
-              Site Conducted <span className="text-red-500">*</span>
+              Site <span className="text-red-500">*</span>
             </label>
             <button
               onClick={() => setShowSiteSheet(true)}
               className="w-full bg-zinc-800 text-left px-4 py-4 rounded-lg border-2 border-zinc-700 flex items-center justify-between group hover:border-zinc-600 transition-colors"
             >
-              <span className={siteConducted ? "text-white" : "text-zinc-500"}>
-                {siteConducted || "Select site..."}
+              <span className={site ? "text-white" : "text-zinc-500"}>
+                {site || "Select site..."}
               </span>
               <ChevronDown className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300" />
             </button>
+          </div>
+
+          {/* House Code */}
+          <div>
+            <label className="block text-zinc-400 text-sm mb-2">
+              House Code
+            </label>
+            <button
+              onClick={() => setShowHouseSheet(true)}
+              className="w-full bg-zinc-800 text-left px-4 py-4 rounded-lg border-2 border-zinc-700 flex items-center justify-between group hover:border-zinc-600 transition-colors"
+            >
+              <span className={houseCode ? "text-white" : "text-zinc-500"}>
+                {houseCode || "Select house code..."}
+              </span>
+              <ChevronDown className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300" />
+            </button>
+          </div>
+
+          {/* Car Number */}
+          <div>
+            <label className="block text-zinc-400 text-sm mb-2">
+              Car Number <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={carNumber}
+                onChange={(e) => setCarNumber(e.target.value.toUpperCase())}
+                placeholder="CN555555"
+                className="w-full bg-zinc-800 text-white pl-4 pr-12 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none font-mono text-lg"
+              />
+              <button 
+                onClick={() => alert("Barcode scan coming soon")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
+              >
+                <ScanBarcode className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
           {/* Date/Time */}
@@ -106,59 +155,26 @@ export default function NewInspection() {
             </div>
           </div>
 
-          {/* House # */}
-          <div>
-            <label className="block text-zinc-400 text-sm mb-2">
-              House #
-            </label>
-            <button
-              onClick={() => setShowHouseSheet(true)}
-              className="w-full bg-zinc-800 text-left px-4 py-4 rounded-lg border-2 border-zinc-700 flex items-center justify-between group hover:border-zinc-600 transition-colors"
-            >
-              <span className={houseNumber ? "text-white" : "text-zinc-500"}>
-                {houseNumber || "Select house number..."}
-              </span>
-              <ChevronDown className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300" />
-            </button>
-          </div>
-
-          {/* Vehicle ID */}
-          <div>
-            <label className="block text-zinc-400 text-sm mb-2">
-              Vehicle ID <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-                placeholder="Enter vehicle ID"
-                className="w-full bg-zinc-800 text-white pl-4 pr-12 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-              />
-              <button 
-                onClick={() => {/* Barcode scan stub */}}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
-              >
-                <ScanBarcode className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
         </div>
 
         {/* Next Button */}
         <div className="mt-12">
           <button
             onClick={handleNext}
-            disabled={!siteConducted || !vehicleId}
+            disabled={!canProceed}
             className={`w-full py-4 rounded-lg text-lg font-bold transition-colors ${
-              siteConducted && vehicleId
+              canProceed
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
             }`}
           >
             Next
           </button>
+          {!canProceed && (
+            <p className="text-center text-sm text-zinc-500 mt-2">
+              Site and Car Number are required
+            </p>
+          )}
         </div>
       </div>
 
@@ -169,20 +185,20 @@ export default function NewInspection() {
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6 flex-shrink-0" />
             <h3 className="text-xl font-bold mb-4">Select Site</h3>
             <div className="space-y-2">
-              {SITE_OPTIONS.map((site) => (
+              {SITE_OPTIONS.map((siteOption) => (
                 <button
-                  key={site}
+                  key={siteOption}
                   onClick={() => {
-                    setSiteConducted(site);
+                    setSite(siteOption);
                     setShowSiteSheet(false);
                   }}
                   className={`w-full text-left px-4 py-4 rounded-lg text-lg font-medium transition-colors ${
-                    siteConducted === site
+                    site === siteOption
                       ? "bg-green-600/20 text-green-500 border border-green-600/50"
                       : "bg-zinc-800 hover:bg-zinc-700 text-white"
                   }`}
                 >
-                  {site}
+                  {siteOption}
                 </button>
               ))}
               <button
@@ -201,17 +217,17 @@ export default function NewInspection() {
         <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50">
           <div className="bg-zinc-900 rounded-t-3xl w-full max-w-2xl border-t-2 border-zinc-800 p-6 animate-slide-up max-h-[80vh] overflow-y-auto">
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6 flex-shrink-0" />
-            <h3 className="text-xl font-bold mb-4">Select House #</h3>
+            <h3 className="text-xl font-bold mb-4">Select House Code</h3>
             <div className="space-y-2">
               {HOUSE_OPTIONS.map((house) => (
                 <button
                   key={house}
                   onClick={() => {
-                    setHouseNumber(house);
+                    setHouseCode(house);
                     setShowHouseSheet(false);
                   }}
                   className={`w-full text-left px-4 py-4 rounded-lg text-lg font-medium transition-colors ${
-                    houseNumber === house
+                    houseCode === house
                       ? "bg-green-600/20 text-green-500 border border-green-600/50"
                       : "bg-zinc-800 hover:bg-zinc-700 text-white"
                   }`}
