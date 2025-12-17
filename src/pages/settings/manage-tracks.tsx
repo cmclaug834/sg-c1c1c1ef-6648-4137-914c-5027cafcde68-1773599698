@@ -1,6 +1,6 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Track } from "@/types";
 
@@ -22,6 +22,9 @@ export default function ManageTracks() {
   const [validation, setValidation] = useState("");
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [mounted, setMounted] = useState(false);
+  
+  // Delete confirmation dialog state
+  const [deleteDialogTrack, setDeleteDialogTrack] = useState<Track | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -104,6 +107,18 @@ export default function ManageTracks() {
         : track
     ));
     setHasChanges(true);
+  };
+
+  const handleDeleteTrack = (track: Track) => {
+    setDeleteDialogTrack(track);
+  };
+
+  const confirmDeleteTrack = () => {
+    if (!deleteDialogTrack) return;
+    
+    setLocalTracks(prev => prev.filter(t => t.id !== deleteDialogTrack.id));
+    setHasChanges(true);
+    setDeleteDialogTrack(null);
   };
 
   const validateTrackCode = (code: string): boolean => {
@@ -245,6 +260,15 @@ export default function ManageTracks() {
                         className="w-full bg-zinc-900 text-white text-base px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
                       />
                     </div>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => handleDeleteTrack(track)}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Track
+                    </button>
                   </div>
 
                   {/* Enabled Toggle */}
@@ -370,6 +394,49 @@ export default function ManageTracks() {
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteDialogTrack && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <h2 className="text-2xl font-bold mb-4">Delete Track?</h2>
+            
+            <p className="text-zinc-400 text-lg mb-2">
+              Are you sure you want to delete <span className="font-mono font-semibold text-white">{deleteDialogTrack.name}</span>
+              {deleteDialogTrack.displayName && (
+                <span> ({deleteDialogTrack.displayName})</span>
+              )}?
+            </p>
+            
+            {deleteDialogTrack.cars.length > 0 && (
+              <p className="text-red-400 text-base mb-6 font-semibold">
+                This track has {deleteDialogTrack.cars.length} car{deleteDialogTrack.cars.length !== 1 ? 's' : ''}. All car data will be permanently deleted.
+              </p>
+            )}
+            
+            {deleteDialogTrack.cars.length === 0 && (
+              <p className="text-zinc-500 text-sm mb-6">
+                This track is empty and can be safely deleted.
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteDialogTrack(null)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteTrack}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
