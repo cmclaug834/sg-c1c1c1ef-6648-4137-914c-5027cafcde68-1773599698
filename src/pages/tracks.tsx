@@ -182,7 +182,7 @@ export default function TrackSelect() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      {/* A.trackName - Show track code as main title */}
+                      {/* A.trackName */}
                       <h2 className="A.trackName text-2xl md:text-3xl font-bold mb-1 truncate">
                         {track.name}
                       </h2>
@@ -204,7 +204,7 @@ export default function TrackSelect() {
                     {/* Right side: Display name + Status icon */}
                     <div className="flex-shrink-0 flex flex-col items-end gap-2">
                       {/* Display name if exists */}
-                      {track.displayName?.trim() && (
+                      {track.displayName && track.displayName.trim() && (
                         <div className="text-right">
                           <p className="text-zinc-400 text-sm font-medium">
                             {track.displayName}
@@ -304,7 +304,7 @@ export default function TrackSelect() {
                           {/* Right side: Display name + Status icon */}
                           <div className="flex-shrink-0 flex flex-col items-end gap-2">
                             {/* Display name if exists */}
-                            {track.displayName?.trim() && (
+                            {track.displayName && track.displayName.trim() && (
                               <div className="text-right">
                                 <p className="text-zinc-400 text-sm font-medium">
                                   {track.displayName}
