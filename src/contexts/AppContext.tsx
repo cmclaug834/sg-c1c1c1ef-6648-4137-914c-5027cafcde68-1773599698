@@ -50,22 +50,27 @@ function repairTrackData(tracks: Track[]): Track[] {
           ...car,
           id: newId,
           carNumber: normalized,
+          status: car.status || "pending",
+          carType: car.carType || "Unknown",
         };
       }
 
       usedIds.add(car.id);
-      return needsNormalization ? { ...car, carNumber: normalized } : car;
+      
+      // Preserve all car fields, only fix missing required fields
+      return {
+        ...car,
+        carNumber: needsNormalization ? normalized : car.carNumber,
+        status: car.status || "pending",
+        carType: car.carType || "Unknown",
+      };
     });
 
-    // Remove legacy totalCars and confirmedCars if present
-    // These will be computed dynamically going forward
-    const cleanedTrack: Track = {
-      id: track.id,
-      name: track.name,
+    // Preserve all track fields, only apply defaults for missing optional fields
+    const repairedTrack: Track = {
+      ...track,
       cars: repairedCars,
-      lastChecked: track.lastChecked,
-      lastCheckClearedAt: track.lastCheckClearedAt,
-      enabled: track.enabled,
+      enabled: track.enabled ?? true,
     };
 
     // Check if legacy counts existed and were wrong
@@ -78,7 +83,7 @@ function repairTrackData(tracks: Track[]): Track[] {
       }
     }
 
-    return cleanedTrack;
+    return repairedTrack;
   });
 
   if (repairCount > 0) {
