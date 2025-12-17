@@ -7,16 +7,17 @@ import { useApp } from "@/contexts/AppContext";
 
 export default function SignaturePage() {
   const router = useRouter();
-  const { id, target } = router.query;
+  const { inspectionId, type, returnTo, scrollY } = router.query;
   const { currentUser } = useApp();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
 
-  const signatureTarget = (target as string) || "final";
-  const isInitialSignature = signatureTarget === "initial";
+  const signatureType = (type as string) || "final";
+  const isInitialSignature = signatureType === "initial";
 
   useEffect(() => {
     setMounted(true);
@@ -29,13 +30,13 @@ export default function SignaturePage() {
       return;
     }
     
-    if (typeof id === "string") {
-      const loaded = inspectionStorage.getInspection(id);
+    if (typeof inspectionId === "string") {
+      const loaded = inspectionStorage.getInspection(inspectionId);
       if (loaded) {
         setInspection(loaded);
       }
     }
-  }, [mounted, id, currentUser, router]);
+  }, [mounted, inspectionId, currentUser, router]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -83,6 +84,7 @@ export default function SignaturePage() {
     if (!ctx) return;
 
     setIsDrawing(true);
+    setHasDrawn(true);
 
     const rect = canvas.getBoundingClientRect();
     let x, y;
@@ -159,11 +161,19 @@ export default function SignaturePage() {
     ctx.font = "14px system-ui";
     ctx.textAlign = "center";
     ctx.fillText("Sign above the dotted line", rect.width / 2, rect.height - 40);
+    
+    setHasDrawn(false);
   };
 
   const saveSignature = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    
+    // Validate signature was drawn
+    if (!hasDrawn) {
+      alert("Please sign before saving");
+      return;
+    }
 
     const signatureDataUrl = canvas.toDataURL("image/png");
 
@@ -174,7 +184,7 @@ export default function SignaturePage() {
       signedAt: new Date().toISOString(),
     };
 
-    // Save to correct location based on target
+    // Save to correct location based on type
     if (isInitialSignature) {
       inspectionStorage.updateInspection(inspection.id, {
         inspectorSignatures: {
@@ -191,8 +201,16 @@ export default function SignaturePage() {
       });
     }
 
-    // Return to the appropriate page
-    router.back();
+    // Navigate back to the return route with scroll restoration
+    if (returnTo && typeof returnTo === "string") {
+      const returnUrl = scrollY 
+        ? `${returnTo}${returnTo.includes("?") ? "&" : "?"}scrollY=${scrollY}`
+        : returnTo;
+      router.push(returnUrl);
+    } else {
+      // Fallback: go back
+      router.back();
+    }
   };
 
   return (
@@ -211,7 +229,12 @@ export default function SignaturePage() {
           </h1>
           <button
             onClick={saveSignature}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
+            disabled={!hasDrawn}
+            className={`px-4 py-2 rounded-lg text-base font-medium transition-colors ${
+              hasDrawn
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+            }`}
           >
             SAVE
           </button>

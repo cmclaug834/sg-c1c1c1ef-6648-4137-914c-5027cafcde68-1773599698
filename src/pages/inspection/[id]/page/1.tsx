@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { ArrowLeft, ChevronDown, Edit } from "lucide-react";
+import { ArrowLeft, ChevronDown, Edit, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection } from "@/types/inspection";
@@ -15,7 +15,7 @@ const REJECT_REASONS = [
 
 export default function InspectionPage1() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, scrollY } = router.query;
   const { currentUser } = useApp();
   
   const [inspection, setInspection] = useState<Inspection | null>(null);
@@ -45,6 +45,19 @@ export default function InspectionPage1() {
     }
   }, [mounted, id, currentUser, router]);
 
+  // Scroll restoration
+  useEffect(() => {
+    if (!mounted || !scrollY) return;
+    const scrollPos = Number(scrollY);
+    if (!isNaN(scrollPos)) {
+      setTimeout(() => {
+        window.scrollTo(0, scrollPos);
+        // Clean up query param
+        router.replace(`/inspection/${id}/page/1`, undefined, { shallow: true });
+      }, 100);
+    }
+  }, [mounted, scrollY, id, router]);
+
   if (!mounted || !currentUser || !inspection) {
     return null;
   }
@@ -65,13 +78,19 @@ export default function InspectionPage1() {
     router.push(`/inspection/${inspection.id}/page/2`);
   };
 
+  const handleSignature = () => {
+    const returnTo = `/inspection/${inspection.id}/page/1`;
+    const currentScrollY = window.scrollY;
+    router.push(
+      `/inspection/${inspection.id}/signature?type=initial&returnTo=${encodeURIComponent(returnTo)}&scrollY=${currentScrollY}`
+    );
+  };
+
   const handleMediaStub = () => {
-    // Stub for future media capture
     alert("Media capture coming soon");
   };
 
   const handleActionStub = (action: string) => {
-    // Stub for future actions
     alert(`${action} coming soon`);
   };
 
@@ -81,7 +100,7 @@ export default function InspectionPage1() {
 
   const getCompletionScore = () => {
     let completed = 0;
-    const total = 2; // Accept/Reject + Initial Signature
+    const total = 2;
     
     if (acceptReject) {
       if (acceptReject === "yes" || (acceptReject === "no" && rejectReason)) {
@@ -233,6 +252,17 @@ export default function InspectionPage1() {
             
             {inspection.inspectorSignatures?.initial?.signatureDataUrl ? (
               <div className="space-y-3">
+                {/* Signed Badge */}
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-green-500 font-medium">Signed</span>
+                  {inspection.inspectorSignatures.initial.signedAt && (
+                    <span className="text-xs text-zinc-500">
+                      {new Date(inspection.inspectorSignatures.initial.signedAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                
                 <div className="bg-white rounded-lg p-4">
                   <img
                     src={inspection.inspectorSignatures.initial.signatureDataUrl}
@@ -244,13 +274,10 @@ export default function InspectionPage1() {
                   {inspection.inspectorSignatures.initial.fullName && (
                     <p>Signed by: {inspection.inspectorSignatures.initial.fullName}</p>
                   )}
-                  {inspection.inspectorSignatures.initial.signedAt && (
-                    <p>Signed at: {new Date(inspection.inspectorSignatures.initial.signedAt).toLocaleString()}</p>
-                  )}
                 </div>
                 <button
                   type="button"
-                  onClick={() => router.push(`/inspection/${inspection.id}/signature?target=initial`)}
+                  onClick={handleSignature}
                   className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <Edit className="w-5 h-5" />
@@ -258,14 +285,24 @@ export default function InspectionPage1() {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => router.push(`/inspection/${inspection.id}/signature?target=initial`)}
-                className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <Edit className="w-5 h-5" />
-                Tap to sign
-              </button>
+              <div className="space-y-3">
+                {/* Required Badge */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 rounded-full border-2 border-red-500 flex items-center justify-center">
+                    <span className="text-red-500 text-xs font-bold">!</span>
+                  </div>
+                  <span className="text-red-500 font-medium">Required</span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={handleSignature}
+                  className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-5 h-5" />
+                  Tap to sign
+                </button>
+              </div>
             )}
           </div>
 

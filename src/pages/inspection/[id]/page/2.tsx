@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { ArrowLeft, Edit } from "lucide-react";
+import { ArrowLeft, Edit, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection } from "@/types/inspection";
@@ -7,7 +7,7 @@ import { useApp } from "@/contexts/AppContext";
 
 export default function InspectionPage2() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, scrollY } = router.query;
   const { currentUser } = useApp();
   
   const [inspection, setInspection] = useState<Inspection | null>(null);
@@ -36,6 +36,19 @@ export default function InspectionPage2() {
     }
   }, [mounted, id, currentUser, router]);
 
+  // Scroll restoration
+  useEffect(() => {
+    if (!mounted || !scrollY) return;
+    const scrollPos = Number(scrollY);
+    if (!isNaN(scrollPos)) {
+      setTimeout(() => {
+        window.scrollTo(0, scrollPos);
+        // Clean up query param
+        router.replace(`/inspection/${id}/page/2`, undefined, { shallow: true });
+      }, 100);
+    }
+  }, [mounted, scrollY, id, router]);
+
   if (!mounted || !currentUser || !inspection) {
     return null;
   }
@@ -52,6 +65,14 @@ export default function InspectionPage2() {
     inspectionStorage.updateInspection(inspection.id, {
       isLoadBalanced: value,
     });
+  };
+
+  const handleSignature = () => {
+    const returnTo = `/inspection/${inspection.id}/page/2`;
+    const currentScrollY = window.scrollY;
+    router.push(
+      `/inspection/${inspection.id}/signature?type=final&returnTo=${encodeURIComponent(returnTo)}&scrollY=${currentScrollY}`
+    );
   };
 
   const handleComplete = () => {
@@ -203,7 +224,7 @@ export default function InspectionPage2() {
             )}
           </div>
 
-          {/* Signature Section */}
+          {/* Final Signature Section */}
           <div className="bg-zinc-800 rounded-lg p-4">
             <h3 className="text-base font-medium mb-3">
               Inspector Signature (Final) <span className="text-red-500">*</span>
@@ -211,6 +232,17 @@ export default function InspectionPage2() {
             
             {inspection.inspectorSignatures?.final?.signatureDataUrl ? (
               <div className="space-y-3">
+                {/* Signed Badge */}
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-green-500 font-medium">Signed</span>
+                  {inspection.inspectorSignatures.final.signedAt && (
+                    <span className="text-xs text-zinc-500">
+                      {new Date(inspection.inspectorSignatures.final.signedAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                
                 <div className="bg-white rounded-lg p-4">
                   <img
                     src={inspection.inspectorSignatures.final.signatureDataUrl}
@@ -222,12 +254,9 @@ export default function InspectionPage2() {
                   {inspection.inspectorSignatures.final.fullName && (
                     <p>Signed by: {inspection.inspectorSignatures.final.fullName}</p>
                   )}
-                  {inspection.inspectorSignatures.final.signedAt && (
-                    <p>Signed at: {new Date(inspection.inspectorSignatures.final.signedAt).toLocaleString()}</p>
-                  )}
                 </div>
                 <button
-                  onClick={() => router.push(`/inspection/${inspection.id}/signature?target=final`)}
+                  onClick={handleSignature}
                   className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <Edit className="w-5 h-5" />
@@ -235,13 +264,23 @@ export default function InspectionPage2() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => router.push(`/inspection/${inspection.id}/signature?target=final`)}
-                className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <Edit className="w-5 h-5" />
-                Tap to sign
-              </button>
+              <div className="space-y-3">
+                {/* Required Badge */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 rounded-full border-2 border-red-500 flex items-center justify-center">
+                    <span className="text-red-500 text-xs font-bold">!</span>
+                  </div>
+                  <span className="text-red-500 font-medium">Required</span>
+                </div>
+                
+                <button
+                  onClick={handleSignature}
+                  className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-5 h-5" />
+                  Tap to sign
+                </button>
+              </div>
             )}
           </div>
 
