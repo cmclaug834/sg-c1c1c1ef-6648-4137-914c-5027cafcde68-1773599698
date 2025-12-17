@@ -12,6 +12,7 @@ export default function InspectionPage2() {
   
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [isLoadBalanced, setIsLoadBalanced] = useState<"yes" | "no" | undefined>(undefined);
+  const [loadNo, setLoadNo] = useState("");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function InspectionPage2() {
       if (loaded) {
         setInspection(loaded);
         setIsLoadBalanced(loaded.isLoadBalanced);
+        setLoadNo(loaded.loadNo || "");
       }
     }
   }, [mounted, id, currentUser, router]);
@@ -38,13 +40,27 @@ export default function InspectionPage2() {
     return null;
   }
 
+  const handleLoadNoChange = (value: string) => {
+    setLoadNo(value);
+    inspectionStorage.updateInspection(inspection.id, {
+      loadNo: value,
+    });
+  };
+
+  const handleLoadBalancedChange = (value: "yes" | "no") => {
+    setIsLoadBalanced(value);
+    inspectionStorage.updateInspection(inspection.id, {
+      isLoadBalanced: value,
+    });
+  };
+
   const handleComplete = () => {
     if (!isLoadBalanced) return;
-    if (!inspection.inspectorSignature?.signatureDataUrl) return;
+    if (!loadNo.trim()) return;
+    if (!inspection.inspectorSignatures?.final?.signatureDataUrl) return;
 
     // Mark inspection as complete
     inspectionStorage.updateInspection(inspection.id, {
-      isLoadBalanced,
       status: "complete",
     });
 
@@ -52,14 +68,18 @@ export default function InspectionPage2() {
     router.push("/inspections");
   };
 
-  const canComplete = isLoadBalanced && inspection.inspectorSignature?.signatureDataUrl;
+  const canComplete = 
+    isLoadBalanced && 
+    loadNo.trim() && 
+    inspection.inspectorSignatures?.final?.signatureDataUrl;
 
   const getCompletionScore = () => {
     let completed = 0;
-    const total = 2;
+    const total = 3;
     
     if (isLoadBalanced) completed++;
-    if (inspection.inspectorSignature?.signatureDataUrl) completed++;
+    if (loadNo.trim()) completed++;
+    if (inspection.inspectorSignatures?.final?.signatureDataUrl) completed++;
     
     return { completed, total, percentage: Math.round((completed / total) * 100) };
   };
@@ -98,7 +118,7 @@ export default function InspectionPage2() {
             
             <div className="grid grid-cols-2 gap-3 mb-4">
               <button
-                onClick={() => setIsLoadBalanced("yes")}
+                onClick={() => handleLoadBalancedChange("yes")}
                 className={`py-6 rounded-lg text-lg font-bold transition-colors ${
                   isLoadBalanced === "yes"
                     ? "bg-green-600 text-white"
@@ -108,7 +128,7 @@ export default function InspectionPage2() {
                 Yes
               </button>
               <button
-                onClick={() => setIsLoadBalanced("no")}
+                onClick={() => handleLoadBalancedChange("no")}
                 className={`py-6 rounded-lg text-lg font-bold transition-colors ${
                   isLoadBalanced === "no"
                     ? "bg-red-600 text-white"
@@ -123,25 +143,25 @@ export default function InspectionPage2() {
           {/* Action Buttons Row (Stubs) */}
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => {/* Stub */}}
+              onClick={() => alert("Add note coming soon")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               Add note
             </button>
             <button
-              onClick={() => {/* Stub */}}
+              onClick={() => alert("Media coming soon")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               Media
             </button>
             <button
-              onClick={() => {/* Stub */}}
+              onClick={() => alert("Action coming soon")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               Action
             </button>
             <button
-              onClick={() => {/* Stub */}}
+              onClick={() => alert("History coming soon")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               History
@@ -154,7 +174,7 @@ export default function InspectionPage2() {
               PICTURE(s) of doorway before closing door with railcar number visible
             </p>
             <button
-              onClick={() => {/* Stub */}}
+              onClick={() => alert("Media coming soon")}
               className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors"
             >
               ADD MEDIA
@@ -164,29 +184,50 @@ export default function InspectionPage2() {
             </p>
           </div>
 
+          {/* Load No Field */}
+          <div className="bg-zinc-800 rounded-lg p-4">
+            <label className="block text-base font-medium mb-3">
+              Load No <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={loadNo}
+              onChange={(e) => handleLoadNoChange(e.target.value)}
+              placeholder="Tap here to edit"
+              className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+            />
+            {!loadNo.trim() && (
+              <p className="text-xs text-zinc-500 mt-2">
+                Required to complete inspection
+              </p>
+            )}
+          </div>
+
           {/* Signature Section */}
           <div className="bg-zinc-800 rounded-lg p-4">
-            <h3 className="text-base font-medium mb-3">Inspector Signature</h3>
+            <h3 className="text-base font-medium mb-3">
+              Inspector Signature (Final) <span className="text-red-500">*</span>
+            </h3>
             
-            {inspection.inspectorSignature?.signatureDataUrl ? (
+            {inspection.inspectorSignatures?.final?.signatureDataUrl ? (
               <div className="space-y-3">
                 <div className="bg-white rounded-lg p-4">
                   <img
-                    src={inspection.inspectorSignature.signatureDataUrl}
+                    src={inspection.inspectorSignatures.final.signatureDataUrl}
                     alt="Inspector signature"
                     className="w-full h-32 object-contain"
                   />
                 </div>
                 <div className="text-sm text-zinc-400">
-                  {inspection.inspectorSignature.fullName && (
-                    <p>Signed by: {inspection.inspectorSignature.fullName}</p>
+                  {inspection.inspectorSignatures.final.fullName && (
+                    <p>Signed by: {inspection.inspectorSignatures.final.fullName}</p>
                   )}
-                  {inspection.inspectorSignature.signedAt && (
-                    <p>Signed at: {new Date(inspection.inspectorSignature.signedAt).toLocaleString()}</p>
+                  {inspection.inspectorSignatures.final.signedAt && (
+                    <p>Signed at: {new Date(inspection.inspectorSignatures.final.signedAt).toLocaleString()}</p>
                   )}
                 </div>
                 <button
-                  onClick={() => router.push(`/inspection/${inspection.id}/signature`)}
+                  onClick={() => router.push(`/inspection/${inspection.id}/signature?target=final`)}
                   className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <Edit className="w-5 h-5" />
@@ -195,11 +236,11 @@ export default function InspectionPage2() {
               </div>
             ) : (
               <button
-                onClick={() => router.push(`/inspection/${inspection.id}/signature`)}
+                onClick={() => router.push(`/inspection/${inspection.id}/signature?target=final`)}
                 className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
               >
                 <Edit className="w-5 h-5" />
-                Add Signature
+                Tap to sign
               </button>
             )}
           </div>
@@ -221,7 +262,7 @@ export default function InspectionPage2() {
           </button>
           {!canComplete && (
             <p className="text-center text-sm text-zinc-500 mt-2">
-              Complete all fields and add signature to finish
+              Complete all required fields, add Load No, and sign to finish
             </p>
           )}
         </div>

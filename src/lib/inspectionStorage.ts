@@ -2,13 +2,39 @@ import { Inspection } from "@/types/inspection";
 
 const STORAGE_KEY = "gp_inspections_v1";
 
+/**
+ * Migrate old inspection format to new dual signature format
+ * Backwards compatibility for inspections created before dual signature implementation
+ */
+function migrateInspection(inspection: any): Inspection {
+  // If inspection has old single signature field, migrate to final signature
+  if (inspection.inspectorSignature && !inspection.inspectorSignatures) {
+    return {
+      ...inspection,
+      inspectorSignatures: {
+        final: {
+          signatureDataUrl: inspection.inspectorSignature.signatureDataUrl,
+          signedAt: inspection.inspectorSignature.signedAt,
+          fullName: inspection.inspectorSignature.fullName,
+        }
+      },
+      // Remove old field
+      inspectorSignature: undefined,
+    };
+  }
+  
+  return inspection;
+}
+
 export const inspectionStorage = {
   getInspections: (): Inspection[] => {
     if (typeof window === "undefined") return [];
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (!data) return [];
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Migrate all inspections on load
+      return parsed.map(migrateInspection);
     } catch (error) {
       console.error("[InspectionStorage] Failed to parse inspections:", error);
       return [];

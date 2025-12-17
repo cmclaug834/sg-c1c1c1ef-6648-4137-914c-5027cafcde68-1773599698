@@ -12,12 +12,11 @@ export default function NewInspection() {
   const { currentUser } = useApp();
   const [mounted, setMounted] = useState(false);
   
-  // Form State
+  // Form State (Load No removed)
   const [siteConducted, setSiteConducted] = useState("");
   const [dateTime, setDateTime] = useState("");
   const [houseNumber, setHouseNumber] = useState("");
   const [vehicleId, setVehicleId] = useState("");
-  const [loadNo, setLoadNo] = useState("");
   
   // Sheet State
   const [showSiteSheet, setShowSiteSheet] = useState(false);
@@ -25,11 +24,7 @@ export default function NewInspection() {
 
   useEffect(() => {
     setMounted(true);
-    // Set current date/time in local format slightly formatted for input if needed
-    // or just display string. Screenshot implies a display string or picker.
-    // We'll use ISO string for storage, formatted string for display
     const now = new Date();
-    // Format: YYYY-MM-DDTHH:mm
     const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
     setDateTime(localIso);
   }, []);
@@ -44,7 +39,7 @@ export default function NewInspection() {
   if (!mounted || !currentUser) return null;
 
   const handleNext = () => {
-    // Create the inspection record
+    // Create the inspection record (without Load No)
     const newInspection = inspectionStorage.createInspection({
       templateId: "gp-rail-car-inspection-v1",
       status: "draft",
@@ -52,7 +47,6 @@ export default function NewInspection() {
       dateTime,
       houseNumber,
       vehicleId,
-      loadNo,
       media: {},
     });
 
@@ -141,24 +135,13 @@ export default function NewInspection() {
                 placeholder="Enter vehicle ID"
                 className="w-full bg-zinc-800 text-white pl-4 pr-12 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
               />
-              <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors">
+              <button 
+                onClick={() => {/* Barcode scan stub */}}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
+              >
                 <ScanBarcode className="w-6 h-6" />
               </button>
             </div>
-          </div>
-
-          {/* Load No */}
-          <div>
-            <label className="block text-zinc-400 text-sm mb-2">
-              Load No
-            </label>
-            <input
-              type="text"
-              value={loadNo}
-              onChange={(e) => setLoadNo(e.target.value)}
-              placeholder="Enter load number"
-              className="w-full bg-zinc-800 text-white px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-            />
           </div>
 
         </div>

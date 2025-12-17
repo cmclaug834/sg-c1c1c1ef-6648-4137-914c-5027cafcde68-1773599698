@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Edit } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection } from "@/types/inspection";
@@ -52,6 +52,7 @@ export default function InspectionPage1() {
   const handleNext = () => {
     if (!acceptReject) return;
     if (acceptReject === "no" && !rejectReason) return;
+    if (!inspection.inspectorSignatures?.initial?.signatureDataUrl) return;
 
     // Update inspection
     inspectionStorage.updateInspection(inspection.id, {
@@ -64,16 +65,32 @@ export default function InspectionPage1() {
     router.push(`/inspection/${inspection.id}/page/2`);
   };
 
-  const canProceed = acceptReject && (acceptReject === "yes" || rejectReason);
+  const handleMediaStub = () => {
+    // Stub for future media capture
+    alert("Media capture coming soon");
+  };
+
+  const handleActionStub = (action: string) => {
+    // Stub for future actions
+    alert(`${action} coming soon`);
+  };
+
+  const canProceed = acceptReject && 
+    (acceptReject === "yes" || rejectReason) &&
+    inspection.inspectorSignatures?.initial?.signatureDataUrl;
 
   const getCompletionScore = () => {
     let completed = 0;
-    const total = 1;
+    const total = 2; // Accept/Reject + Initial Signature
     
     if (acceptReject) {
       if (acceptReject === "yes" || (acceptReject === "no" && rejectReason)) {
-        completed = 1;
+        completed++;
       }
+    }
+    
+    if (inspection.inspectorSignatures?.initial?.signatureDataUrl) {
+      completed++;
     }
     
     return { completed, total, percentage: Math.round((completed / total) * 100) };
@@ -113,6 +130,7 @@ export default function InspectionPage1() {
             
             <div className="grid grid-cols-2 gap-3 mb-4">
               <button
+                type="button"
                 onClick={() => {
                   setAcceptReject("yes");
                   setRejectReason("");
@@ -126,6 +144,7 @@ export default function InspectionPage1() {
                 Yes
               </button>
               <button
+                type="button"
                 onClick={() => setAcceptReject("no")}
                 className={`py-6 rounded-lg text-lg font-bold transition-colors ${
                   acceptReject === "no"
@@ -144,6 +163,7 @@ export default function InspectionPage1() {
                   Reason for Reject <span className="text-red-500">*</span>
                 </label>
                 <button
+                  type="button"
                   onClick={() => setShowRejectSheet(true)}
                   className="w-full bg-zinc-800 text-left px-4 py-4 rounded-lg border-2 border-zinc-700 flex items-center justify-between group hover:border-zinc-600 transition-colors"
                 >
@@ -156,28 +176,32 @@ export default function InspectionPage1() {
             )}
           </div>
 
-          {/* Action Buttons Row (Stubs) */}
+          {/* Action Buttons Row */}
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => {/* Stub */}}
+              type="button"
+              onClick={() => handleActionStub("Add note")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               Add note
             </button>
             <button
-              onClick={() => {/* Stub */}}
+              type="button"
+              onClick={handleMediaStub}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               Media
             </button>
             <button
-              onClick={() => {/* Stub */}}
+              type="button"
+              onClick={() => handleActionStub("Action")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               Action
             </button>
             <button
-              onClick={() => {/* Stub */}}
+              type="button"
+              onClick={() => handleActionStub("History")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
               History
@@ -190,7 +214,8 @@ export default function InspectionPage1() {
               PICTURE(s) of 1) Exterior doorway with railcar number; 2) Interior each side from doorway
             </p>
             <button
-              onClick={() => {/* Stub */}}
+              type="button"
+              onClick={handleMediaStub}
               className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors"
             >
               ADD MEDIA
@@ -200,11 +225,56 @@ export default function InspectionPage1() {
             </p>
           </div>
 
+          {/* Initial Signature Section */}
+          <div className="bg-zinc-800 rounded-lg p-4">
+            <h3 className="text-base font-medium mb-3">
+              Inspector Signature (Initial) <span className="text-red-500">*</span>
+            </h3>
+            
+            {inspection.inspectorSignatures?.initial?.signatureDataUrl ? (
+              <div className="space-y-3">
+                <div className="bg-white rounded-lg p-4">
+                  <img
+                    src={inspection.inspectorSignatures.initial.signatureDataUrl}
+                    alt="Initial signature"
+                    className="w-full h-32 object-contain"
+                  />
+                </div>
+                <div className="text-sm text-zinc-400">
+                  {inspection.inspectorSignatures.initial.fullName && (
+                    <p>Signed by: {inspection.inspectorSignatures.initial.fullName}</p>
+                  )}
+                  {inspection.inspectorSignatures.initial.signedAt && (
+                    <p>Signed at: {new Date(inspection.inspectorSignatures.initial.signedAt).toLocaleString()}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/inspection/${inspection.id}/signature?target=initial`)}
+                  className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-5 h-5" />
+                  Re-sign
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push(`/inspection/${inspection.id}/signature?target=initial`)}
+                className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <Edit className="w-5 h-5" />
+                Tap to sign
+              </button>
+            )}
+          </div>
+
         </div>
 
         {/* Next Button */}
         <div className="mt-12">
           <button
+            type="button"
             onClick={handleNext}
             disabled={!canProceed}
             className={`w-full py-4 rounded-lg text-lg font-bold transition-colors ${
@@ -215,6 +285,11 @@ export default function InspectionPage1() {
           >
             Next
           </button>
+          {!canProceed && (
+            <p className="text-center text-sm text-zinc-500 mt-2">
+              Complete all fields and add initial signature to continue
+            </p>
+          )}
         </div>
       </div>
 
@@ -227,6 +302,7 @@ export default function InspectionPage1() {
             <div className="space-y-2">
               {REJECT_REASONS.map((reason) => (
                 <button
+                  type="button"
                   key={reason}
                   onClick={() => {
                     setRejectReason(reason);
@@ -242,6 +318,7 @@ export default function InspectionPage1() {
                 </button>
               ))}
               <button
+                type="button"
                 onClick={() => setShowRejectSheet(false)}
                 className="w-full text-center px-4 py-4 mt-4 text-zinc-400 hover:text-white"
               >

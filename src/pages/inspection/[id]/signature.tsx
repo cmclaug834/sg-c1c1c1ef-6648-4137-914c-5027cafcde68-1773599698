@@ -7,13 +7,16 @@ import { useApp } from "@/contexts/AppContext";
 
 export default function SignaturePage() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, target } = router.query;
   const { currentUser } = useApp();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  const signatureTarget = (target as string) || "final";
+  const isInitialSignature = signatureTarget === "initial";
 
   useEffect(() => {
     setMounted(true);
@@ -164,14 +167,31 @@ export default function SignaturePage() {
 
     const signatureDataUrl = canvas.toDataURL("image/png");
 
-    inspectionStorage.updateInspection(inspection.id, {
-      inspectorSignature: {
-        fullName: currentUser.crewName,
-        signatureDataUrl,
-        signedAt: new Date().toISOString(),
-      },
-    });
+    // Prepare signature data
+    const signatureData = {
+      fullName: currentUser.crewName,
+      signatureDataUrl,
+      signedAt: new Date().toISOString(),
+    };
 
+    // Save to correct location based on target
+    if (isInitialSignature) {
+      inspectionStorage.updateInspection(inspection.id, {
+        inspectorSignatures: {
+          ...inspection.inspectorSignatures,
+          initial: signatureData,
+        },
+      });
+    } else {
+      inspectionStorage.updateInspection(inspection.id, {
+        inspectorSignatures: {
+          ...inspection.inspectorSignatures,
+          final: signatureData,
+        },
+      });
+    }
+
+    // Return to the appropriate page
     router.back();
   };
 
@@ -186,7 +206,9 @@ export default function SignaturePage() {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-xl font-bold">Inspector Signature</h1>
+          <h1 className="text-xl font-bold">
+            {isInitialSignature ? "Inspector Signature (Initial)" : "Inspector Signature"}
+          </h1>
           <button
             onClick={saveSignature}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"

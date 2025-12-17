@@ -13,7 +13,7 @@ export interface Inspection {
   dateTime?: string;
   houseNumber?: string;
   vehicleId?: string;
-  loadNo?: string;
+  loadNo?: string;  // Keep for backwards compatibility, but collect on Page 2 going forward
   
   // Page 1 - Accept/Reject
   acceptReject?: "yes" | "no";
@@ -31,7 +31,21 @@ export interface Inspection {
   // Notes / actions stubs
   notes?: string[];
   
-  // Signature
+  // Dual signatures: initial (Page 1) and final (Page 2)
+  inspectorSignatures?: {
+    initial?: {
+      fullName?: string;
+      signatureDataUrl?: string;
+      signedAt?: string;
+    };
+    final?: {
+      fullName?: string;
+      signatureDataUrl?: string;
+      signedAt?: string;
+    };
+  };
+  
+  // Legacy signature support (backwards compatibility)
   inspectorSignature?: {
     fullName?: string;
     signatureDataUrl?: string;
