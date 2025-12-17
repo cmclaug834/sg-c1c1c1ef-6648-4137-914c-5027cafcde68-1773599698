@@ -108,9 +108,9 @@ export default function FrontPage() {
 
     // Create user object
     const user: User = {
-      id: `user-${Date.now()}`,
-      name: name.trim(),
+      crewName: name.trim(),
       crewId: crewId.trim(),
+      timestamp: new Date().toISOString(),
     };
 
     // Set user in context
