@@ -4,9 +4,10 @@ import { ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
 import type { DebugLogEntry } from "@/lib/diagnostics";
+import type { User } from "@/types";
 
 export default function Settings() {
-  const { currentUser, settings, updateSettings, tracks, addTrack, saveTracks, appName, siteName, updateBranding } = useApp();
+  const { currentUser, settings, updateSettings, tracks, addTrack, saveTracks, appName, siteName, updateBranding, setCurrentUser } = useApp();
   const router = useRouter();
   const [requireDialog, setRequireDialog] = useState(false);
   const [resolveOnDone, setResolveOnDone] = useState(true);
@@ -31,6 +32,10 @@ export default function Settings() {
   const [shiftChangeA, setShiftChangeA] = useState("06:00");
   const [shiftChangeB, setShiftChangeB] = useState("18:00");
 
+  const [localCrewName, setLocalCrewName] = useState("");
+  const [localCrewId, setLocalCrewId] = useState("");
+  const [crewValidation, setCrewValidation] = useState("");
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -47,8 +52,10 @@ export default function Settings() {
       setLocalSiteName(siteName);
       setShiftChangeA(settings.shiftChangeA ?? "06:00");
       setShiftChangeB(settings.shiftChangeB ?? "18:00");
+      setLocalCrewName(currentUser?.crewName ?? "");
+      setLocalCrewId(currentUser?.crewId ?? "");
     }
-  }, [mounted, settings, tracks, appName, siteName]);
+  }, [mounted, settings, tracks, appName, siteName, currentUser]);
 
   const handleToggleDialog = () => {
     const newValue = !requireDialog;
@@ -197,6 +204,23 @@ export default function Settings() {
     }, 1500);
   };
 
+  const handleSaveCrew = () => {
+    if (!localCrewName.trim() || !localCrewId.trim()) {
+      setCrewValidation("Both crew name and ID are required");
+      return;
+    }
+
+    const updatedUser: User = {
+      crewName: localCrewName.trim(),
+      crewId: localCrewId.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    setCurrentUser(updatedUser);
+    setCrewValidation("Crew information saved successfully");
+    setTimeout(() => setCrewValidation(""), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-900 text-white">
       <div className="max-w-2xl mx-auto px-4 py-6">
@@ -215,6 +239,61 @@ export default function Settings() {
             Settings
           </h1>
           <div className="w-14" />
+        </div>
+
+        {/* D.sectionCrew - NEW SECTION */}
+        <div id="D.sectionCrew" className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Crew Information</h2>
+
+          <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
+            {/* D.crewNameField */}
+            <div id="D.crewNameField">
+              <label className="block text-zinc-400 mb-2 text-base">Crew Name</label>
+              <input
+                type="text"
+                value={localCrewName}
+                onChange={(e) => {
+                  setLocalCrewName(e.target.value);
+                  setCrewValidation("");
+                }}
+                className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                placeholder="Enter crew name"
+              />
+            </div>
+
+            {/* D.crewIdField */}
+            <div id="D.crewIdField">
+              <label className="block text-zinc-400 mb-2 text-base">Crew ID</label>
+              <input
+                type="text"
+                value={localCrewId}
+                onChange={(e) => {
+                  setLocalCrewId(e.target.value);
+                  setCrewValidation("");
+                }}
+                className="w-full bg-zinc-900 text-white text-lg px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none font-mono"
+                placeholder="Enter crew ID"
+              />
+            </div>
+
+            {/* D.crewValidationText */}
+            {crewValidation && (
+              <p id="D.crewValidationText" className={`text-sm ${
+                crewValidation.includes("successfully") ? "text-green-500" : "text-yellow-500"
+              }`}>
+                {crewValidation}
+              </p>
+            )}
+
+            {/* D.saveCrewBtn */}
+            <button
+              id="D.saveCrewBtn"
+              onClick={handleSaveCrew}
+              className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
+            >
+              Save Crew Information
+            </button>
+          </div>
         </div>
 
         {/* D.sectionBranding - NEW SECTION */}
