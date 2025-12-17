@@ -70,33 +70,7 @@ export default function FrontPage() {
   useEffect(() => {
     setMounted(true);
     
-    // Only check session once on mount
-    if (hasNavigated.current) return;
-    
-    // Check if session is still valid
-    if (isSessionValid()) {
-      // Session valid, bypass landing page and go to tracks
-      const activeCrew = storage.getActiveCrew();
-      if (activeCrew) {
-        // Mark navigation as initiated
-        hasNavigated.current = true;
-        
-        // Restore user in context
-        setUser({
-          id: `user-${Date.now()}`,
-          name: activeCrew.name,
-          crewId: activeCrew.crewId,
-        });
-        
-        // Navigate to tracks after a tick to avoid iframe security issues
-        setTimeout(() => {
-          router.push("/tracks");
-        }, 0);
-        return;
-      }
-    }
-    
-    // Session expired or no active crew, show landing page
+    // Load profiles and pre-fill with most recent
     const loadedProfiles = profileStorage.getProfiles();
     setProfiles(loadedProfiles);
     
