@@ -173,10 +173,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [tracks, mounted]);
 
   // Enhance tracks with computed counts for consumer components
-  const tracksWithCounts: TrackWithCounts[] = tracks.map(track => ({
-    ...track,
-    ...computeTrackCounts(track.cars),
-  }));
+  const tracksWithCounts: TrackWithCounts[] = tracks.map(track => {
+    const counts = computeTrackCounts(track.cars);
+    return {
+      ...track,
+      totalCars: counts.totalCars,
+      confirmedCars: counts.confirmedCars,
+    };
+  });
 
   const addCar = (trackId: string, car: Omit<RailCar, "id" | "status">) => {
     setTracks(prev => prev.map(track => {
