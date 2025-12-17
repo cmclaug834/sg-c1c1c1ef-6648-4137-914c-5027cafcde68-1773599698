@@ -7,7 +7,7 @@ import { useApp } from "@/contexts/AppContext";
 
 export default function SignaturePage() {
   const router = useRouter();
-  const { id, type, returnTo, scrollY } = router.query;
+  const { id, type } = router.query;
   const { currentUser } = useApp();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,6 +34,9 @@ export default function SignaturePage() {
       const loaded = inspectionStorage.getInspection(id);
       if (loaded) {
         setInspection(loaded);
+      } else {
+        // Inspection not found, go back to inspections list
+        router.push("/inspections");
       }
     }
   }, [mounted, id, currentUser, router]);
@@ -51,7 +54,7 @@ export default function SignaturePage() {
     canvas.height = rect.height * 2;
     ctx.scale(2, 2);
 
-    // White background only - no lines or text
+    // White background only
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -105,6 +108,7 @@ export default function SignaturePage() {
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -113,7 +117,7 @@ export default function SignaturePage() {
 
     const { x, y } = getCoordinates(e, canvas);
 
-    // Start a new path - this prevents connecting to any previous points
+    // Start a new path
     ctx.beginPath();
     ctx.moveTo(x, y);
     
@@ -122,6 +126,7 @@ export default function SignaturePage() {
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     if (!isDrawing) return;
 
     const canvas = canvasRef.current;
@@ -152,7 +157,7 @@ export default function SignaturePage() {
 
     setIsDrawing(false);
     
-    // Close the current path to prepare for next stroke
+    // Close the current path
     ctx.closePath();
   };
 
@@ -171,8 +176,14 @@ export default function SignaturePage() {
     setIsDrawing(false);
     setHasDrawn(false);
     
-    // Start fresh path state to prevent stray lines
+    // Start fresh path state
     ctx.beginPath();
+  };
+
+  const handleBack = () => {
+    // Determine which page to return to based on signature type
+    const returnPage = isInitialSignature ? "1" : "2";
+    router.push(`/inspection/${inspection.id}/page/${returnPage}`);
   };
 
   const saveSignature = () => {
@@ -185,41 +196,39 @@ export default function SignaturePage() {
       return;
     }
 
-    const signatureDataUrl = canvas.toDataURL("image/png");
+    try {
+      const signatureDataUrl = canvas.toDataURL("image/png");
 
-    // Prepare signature data
-    const signatureData = {
-      fullName: currentUser.crewName,
-      signatureDataUrl,
-      signedAt: new Date().toISOString(),
-    };
+      // Prepare signature data
+      const signatureData = {
+        fullName: currentUser.crewName,
+        signatureDataUrl,
+        signedAt: new Date().toISOString(),
+      };
 
-    // Save to correct location based on type
-    if (isInitialSignature) {
-      inspectionStorage.updateInspection(inspection.id, {
-        inspectorSignatures: {
-          ...inspection.inspectorSignatures,
-          initial: signatureData,
-        },
-      });
-    } else {
-      inspectionStorage.updateInspection(inspection.id, {
-        inspectorSignatures: {
-          ...inspection.inspectorSignatures,
-          final: signatureData,
-        },
-      });
-    }
+      // Save to correct location based on type
+      if (isInitialSignature) {
+        inspectionStorage.updateInspection(inspection.id, {
+          inspectorSignatures: {
+            ...inspection.inspectorSignatures,
+            initial: signatureData,
+          },
+        });
+      } else {
+        inspectionStorage.updateInspection(inspection.id, {
+          inspectorSignatures: {
+            ...inspection.inspectorSignatures,
+            final: signatureData,
+          },
+        });
+      }
 
-    // Navigate back to the return route with scroll restoration
-    if (returnTo && typeof returnTo === "string") {
-      const returnUrl = scrollY 
-        ? `${returnTo}${returnTo.includes("?") ? "&" : "?"}scrollY=${scrollY}`
-        : returnTo;
-      router.push(returnUrl);
-    } else {
-      // Fallback: go back
-      router.back();
+      // Navigate back to the appropriate page
+      const returnPage = isInitialSignature ? "1" : "2";
+      router.push(`/inspection/${inspection.id}/page/${returnPage}`);
+    } catch (error) {
+      console.error("Error saving signature:", error);
+      alert("Failed to save signature. Please try again.");
     }
   };
 
@@ -229,8 +238,9 @@ export default function SignaturePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-zinc-800 rounded-lg transition-colors"
+            type="button"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -240,6 +250,7 @@ export default function SignaturePage() {
           <button
             onClick={saveSignature}
             disabled={!hasDrawn}
+            type="button"
             className={`px-4 py-2 rounded-lg text-base font-medium transition-colors ${
               hasDrawn
                 ? "bg-green-600 hover:bg-green-700 text-white"
@@ -280,6 +291,7 @@ export default function SignaturePage() {
         {/* Clear Button */}
         <button
           onClick={clearSignature}
+          type="button"
           className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors flex items-center justify-center gap-2"
         >
           <X className="w-5 h-5" />
