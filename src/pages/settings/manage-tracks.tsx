@@ -1,8 +1,14 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { Track } from "@/types";
+
+interface ValidationError {
+  trackId: string;
+  field: "trackCode" | "displayName";
+  message: string;
+}
 
 export default function ManageTracks() {
   const { tracks, saveTracks } = useApp();
@@ -14,6 +20,7 @@ export default function ManageTracks() {
   const [newTrackCode, setNewTrackCode] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
   const [validation, setValidation] = useState("");
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,9 +33,60 @@ export default function ManageTracks() {
     }
   }, [mounted, tracks]);
 
+  useEffect(() => {
+    // Validate all tracks whenever localTracks changes
+    const errors: ValidationError[] = [];
+    
+    localTracks.forEach(track => {
+      // Check if track code is empty
+      if (!track.name.trim()) {
+        errors.push({
+          trackId: track.id,
+          field: "trackCode",
+          message: "Track code is required."
+        });
+      }
+      
+      // Check for duplicate track codes among enabled tracks
+      if (track.enabled) {
+        const duplicates = localTracks.filter(
+          t => t.id !== track.id && 
+          t.enabled && 
+          t.name.trim().toUpperCase() === track.name.trim().toUpperCase()
+        );
+        
+        if (duplicates.length > 0) {
+          errors.push({
+            trackId: track.id,
+            field: "trackCode",
+            message: "Track code must be unique."
+          });
+        }
+      }
+    });
+    
+    setValidationErrors(errors);
+  }, [localTracks]);
+
   if (!mounted) {
     return null;
   }
+
+  const getValidationError = (trackId: string, field: "trackCode" | "displayName"): string | null => {
+    const error = validationErrors.find(e => e.trackId === trackId && e.field === field);
+    return error ? error.message : null;
+  };
+
+  const hasValidationErrors = validationErrors.length > 0;
+
+  const handleTrackCodeChange = (trackId: string, newCode: string) => {
+    setLocalTracks(prev => prev.map(track =>
+      track.id === trackId
+        ? { ...track, name: newCode }
+        : track
+    ));
+    setHasChanges(true);
+  };
 
   const handleDisplayNameChange = (trackId: string, newDisplayName: string) => {
     setLocalTracks(prev => prev.map(track =>
@@ -83,6 +141,8 @@ export default function ManageTracks() {
   };
 
   const handleSaveChanges = () => {
+    if (hasValidationErrors) return;
+    
     saveTracks(localTracks);
     setHasChanges(false);
     setValidation("Changes saved successfully");
@@ -126,50 +186,87 @@ export default function ManageTracks() {
 
         {/* Track List */}
         <div className="space-y-4 mb-6">
-          {localTracks.map(track => (
-            <div
-              key={track.id}
-              className="bg-zinc-800 p-5 rounded-xl border border-zinc-700"
-            >
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="flex-1">
-                  <label className="block text-zinc-500 text-sm mb-1">
-                    Track Code
-                  </label>
-                  <div className="text-xl font-mono font-semibold mb-4">
-                    {track.name}
+          {localTracks.map(track => {
+            const trackCodeError = getValidationError(track.id, "trackCode");
+            
+            return (
+              <div
+                key={track.id}
+                className="bg-zinc-800 p-5 rounded-xl border border-zinc-700"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-4">
+                    {/* Track ID (Read-only) */}
+                    <div>
+                      <label className="block text-zinc-500 text-xs mb-1">
+                        Track ID
+                      </label>
+                      <div className="text-sm text-zinc-600 font-mono">
+                        {track.id}
+                      </div>
+                    </div>
+
+                    {/* Track Code (Editable) */}
+                    <div>
+                      <label className="block text-zinc-400 text-sm mb-2">
+                        Track Code <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={track.name}
+                        onChange={(e) => handleTrackCodeChange(track.id, e.target.value)}
+                        className={`w-full bg-zinc-900 text-white text-base font-mono px-4 py-3 rounded-lg border-2 ${
+                          trackCodeError 
+                            ? "border-red-500 focus:border-red-500" 
+                            : "border-zinc-700 focus:border-green-500"
+                        } focus:outline-none`}
+                        placeholder="AS50"
+                      />
+                      {trackCodeError && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {trackCodeError}
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-zinc-600">
+                        Changing the code updates labels only. Cars and history remain unchanged.
+                      </p>
+                    </div>
+
+                    {/* Display Name (Editable) */}
+                    <div>
+                      <label className="block text-zinc-400 text-sm mb-2">
+                        Display Name
+                      </label>
+                      <input
+                        type="text"
+                        value={track.displayName || ""}
+                        onChange={(e) => handleDisplayNameChange(track.id, e.target.value)}
+                        placeholder="North Storage, Tank Line, etc."
+                        className="w-full bg-zinc-900 text-white text-base px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
 
-                  <label className="block text-zinc-400 text-sm mb-2">
-                    Display Name
-                  </label>
-                  <input
-                    type="text"
-                    value={track.displayName || ""}
-                    onChange={(e) => handleDisplayNameChange(track.id, e.target.value)}
-                    placeholder="North Storage, Tank Line, etc."
-                    className="w-full bg-zinc-900 text-white text-base px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex-shrink-0">
-                  <label className="block text-zinc-500 text-sm mb-3">
-                    Enabled
-                  </label>
-                  <button
-                    onClick={() => handleToggleEnabled(track.id)}
-                    className={`w-12 h-7 rounded-full transition-colors relative ${
-                      track.enabled ? "bg-green-600" : "bg-zinc-700"
-                    }`}
-                  >
-                    <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
-                      track.enabled ? "translate-x-5" : ""
-                    }`} />
-                  </button>
+                  {/* Enabled Toggle */}
+                  <div className="flex-shrink-0 pt-6">
+                    <label className="block text-zinc-500 text-sm mb-3">
+                      Enabled
+                    </label>
+                    <button
+                      onClick={() => handleToggleEnabled(track.id)}
+                      className={`w-12 h-7 rounded-full transition-colors relative ${
+                        track.enabled ? "bg-green-600" : "bg-zinc-700"
+                      }`}
+                    >
+                      <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                        track.enabled ? "translate-x-5" : ""
+                      }`} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Add Track Button/Form */}
@@ -262,9 +359,9 @@ export default function ManageTracks() {
           </button>
           <button
             onClick={handleSaveChanges}
-            disabled={!hasChanges}
+            disabled={!hasChanges || hasValidationErrors}
             className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
-              hasChanges
+              hasChanges && !hasValidationErrors
                 ? "bg-green-600 hover:bg-green-700"
                 : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
             }`}
