@@ -187,6 +187,15 @@ export default function TrackSelect() {
                         {track.name}
                       </h2>
                       
+                      {/* Display name centered below track name */}
+                      {track.displayName && track.displayName.trim() && (
+                        <div className="text-center mb-2">
+                          <p className="text-zinc-400 text-base md:text-lg font-medium">
+                            {track.displayName}
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="space-y-1">
                         <div className="text-zinc-400 text-sm md:text-base">
                           Cars: <span className="font-mono font-semibold text-white">
@@ -201,17 +210,8 @@ export default function TrackSelect() {
                       </div>
                     </div>
 
-                    {/* Right side: Display name + Status icon */}
-                    <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                      {/* Display name if exists */}
-                      {track.displayName && track.displayName.trim() && (
-                        <div className="text-right">
-                          <p className="text-zinc-400 text-sm font-medium">
-                            {track.displayName}
-                          </p>
-                        </div>
-                      )}
-                      
+                    {/* Right side: Status icon only */}
+                    <div className="flex-shrink-0">
                       {/* A.trackStatus */}
                       <div className="A.trackStatus">
                         {getStatusIcon(status)}
@@ -288,6 +288,15 @@ export default function TrackSelect() {
                               {track.name}
                             </h2>
                             
+                            {/* Display name centered below track name */}
+                            {track.displayName && track.displayName.trim() && (
+                              <div className="text-center mb-2">
+                                <p className="text-zinc-400 text-base font-medium">
+                                  {track.displayName}
+                                </p>
+                              </div>
+                            )}
+                            
                             <div className="space-y-1">
                               <div className="text-zinc-400 text-sm">
                                 Cars: <span className="font-mono font-semibold text-white">
@@ -301,20 +310,9 @@ export default function TrackSelect() {
                             </div>
                           </div>
 
-                          {/* Right side: Display name + Status icon */}
-                          <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                            {/* Display name if exists */}
-                            {track.displayName && track.displayName.trim() && (
-                              <div className="text-right">
-                                <p className="text-zinc-400 text-sm font-medium">
-                                  {track.displayName}
-                                </p>
-                              </div>
-                            )}
-                            
-                            <div className="flex-shrink-0">
-                              {getStatusIcon(status)}
-                            </div>
+                          {/* Right side: Status icon only */}
+                          <div className="flex-shrink-0">
+                            {getStatusIcon(status)}
                           </div>
                         </div>
                       </button>
