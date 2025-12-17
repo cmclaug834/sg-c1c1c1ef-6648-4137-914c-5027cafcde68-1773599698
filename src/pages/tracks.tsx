@@ -184,9 +184,9 @@ export default function TrackSelect() {
                     <div className="flex-1 min-w-0">
                       {/* A.trackName - Show display name with code as subtitle */}
                       <h2 className="A.trackName text-2xl md:text-3xl font-bold mb-1 truncate">
-                        {track.displayName || track.name}
+                        {track.displayName?.trim() || track.name}
                       </h2>
-                      {track.displayName && (
+                      {track.displayName?.trim() && (
                         <p className="text-zinc-500 text-sm mb-2 font-mono">
                           {track.name}
                         </p>
@@ -278,9 +278,9 @@ export default function TrackSelect() {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <h2 className="text-2xl font-bold mb-1 truncate">
-                              {track.displayName || track.name}
+                              {track.displayName?.trim() || track.name}
                             </h2>
-                            {track.displayName && (
+                            {track.displayName?.trim() && (
                               <p className="text-zinc-500 text-sm mb-2 font-mono">
                                 {track.name}
                               </p>
