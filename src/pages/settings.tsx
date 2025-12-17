@@ -241,6 +241,24 @@ export default function Settings() {
           <div className="w-14" />
         </div>
 
+        {/* D.sectionYardSetup - NEW SECTION */}
+        <div id="D.sectionYardSetup" className="mb-8">
+          <h2 className="text-2xl font-bold mb-6">Yard Setup</h2>
+
+          <button
+            onClick={() => router.push("/settings/manage-tracks")}
+            className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between"
+          >
+            <div>
+              <div className="text-lg font-medium mb-1">Manage Tracks</div>
+              <p className="text-sm text-zinc-500">
+                Rename track display names, add or disable tracks
+              </p>
+            </div>
+            <ArrowLeft className="w-5 h-5 text-zinc-400 rotate-180" />
+          </button>
+        </div>
+
         {/* D.sectionCrew - NEW SECTION */}
         <div id="D.sectionCrew" className="mt-8">
           <h2 className="text-2xl font-bold mb-6">Crew Information</h2>

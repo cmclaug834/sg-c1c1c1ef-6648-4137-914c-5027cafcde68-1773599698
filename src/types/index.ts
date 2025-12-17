@@ -22,6 +22,7 @@ export interface MoveLog {
 export interface Track {
   id: string;
   name: string;
+  displayName?: string;
   cars: RailCar[];
   lastChecked?: string;
   lastCheckClearedAt?: string;
