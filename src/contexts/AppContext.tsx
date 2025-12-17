@@ -121,6 +121,7 @@ interface AppContextType {
   unconfirmCar: (trackId: string, carId: string) => void;
   moveCar: (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE") => boolean;
   setUser: (user: User) => void;
+  setCurrentUser: (user: User) => void;
   updateSettings: (settings: AppSettings) => void;
   updateBranding: (appName: string, siteName: string) => void;
   updateLastChecked: (trackId: string) => void;
@@ -454,6 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unconfirmCar,
       moveCar,
       setUser,
+      setCurrentUser: setUser,
       updateSettings,
       updateBranding,
       updateLastChecked,

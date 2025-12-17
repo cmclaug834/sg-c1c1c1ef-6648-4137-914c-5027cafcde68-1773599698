@@ -29,9 +29,9 @@ export interface Track {
 }
 
 export interface User {
-  id: string;
-  name: string;
+  crewName: string;
   crewId: string;
+  timestamp: string;
 }
 
 export interface AppSettings {
