@@ -2,6 +2,7 @@ export interface RailCar {
   id: string;
   carNumber: string;
   carType: string;
+  tankType?: "C" | "A" | "HP" | "SC";
   confirmedAt?: string;
   confirmedBy?: string;
   status: "pending" | "confirmed" | "missing";

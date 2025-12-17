@@ -8,11 +8,12 @@
  * - Fixed Progress to always compute from track.cars (no drift)
  * - Kept selection mode checkbox independent
  * - Kept all existing move/remove/import functionality
+ * - Added tank type support with quick edit popover
  */
 
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, BadgeCheck, CircleDashed } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, BadgeCheck, CircleDashed, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
@@ -33,6 +34,9 @@ export default function TrackDetail() {
   const [moveToast, setMoveToast] = useState<string | null>(null);
   const [carActionMenu, setCarActionMenu] = useState<{ carId: string; carNumber: string } | null>(null);
   const [removeConfirmCar, setRemoveConfirmCar] = useState<{ carId: string; carNumber: string } | null>(null);
+  
+  // Tank type quick edit
+  const [tankTypeEditCar, setTankTypeEditCar] = useState<{ carId: string; carNumber: string; currentType?: string } | null>(null);
   
   // Pending changes tracking
   const [pendingConfirmations, setPendingConfirmations] = useState<Set<string>>(new Set());
@@ -308,6 +312,29 @@ export default function TrackDetail() {
     setMovePickerCar(null);
   };
 
+  // Handle tank type quick edit save
+  const handleSaveTankType = (newTankType: "C" | "A" | "HP" | "SC") => {
+    if (!tankTypeEditCar) return;
+
+    const updatedTracks = tracks.map(t => {
+      if (t.id === track.id) {
+        const updatedCars = t.cars.map(c => {
+          if (c.id === tankTypeEditCar.carId) {
+            return { ...c, tankType: newTankType };
+          }
+          return c;
+        });
+        return { ...t, cars: updatedCars };
+      }
+      return t;
+    });
+
+    saveTracks(updatedTracks);
+    setTankTypeEditCar(null);
+    setMoveToast(`Tank type set to ${newTankType}`);
+    setTimeout(() => setMoveToast(null), 2000);
+  };
+
   // Handle back button with pending changes check
   const handleBack = () => {
     if (hasPendingChanges) {
@@ -411,6 +438,17 @@ export default function TrackDetail() {
     const hours = Math.floor(diff / 60);
     if (hours < 24) return `${hours}h ago`;
     return date.toLocaleDateString();
+  };
+
+  // Get car type badge display text
+  const getCarTypeBadge = (car: RailCar) => {
+    if (car.carType === "TANK") {
+      if (car.tankType) {
+        return `TANK — ${car.tankType}`;
+      }
+      return "TANK — (?)";
+    }
+    return car.carType;
   };
 
   return (
@@ -583,8 +621,27 @@ export default function TrackDetail() {
                               {normalizeCarId(car.carNumber)}
                             </div>
                             
-                            <div className="text-zinc-400 text-base md:text-lg mb-1">
-                              {car.carType}
+                            <div className="flex items-center gap-2 mb-1">
+                              {/* Car Type Badge */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (car.carType === "TANK") {
+                                    setTankTypeEditCar({
+                                      carId: car.id,
+                                      carNumber: car.carNumber,
+                                      currentType: car.tankType,
+                                    });
+                                  }
+                                }}
+                                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                                  car.carType === "TANK"
+                                    ? "bg-zinc-700 hover:bg-zinc-600 text-zinc-300"
+                                    : "bg-zinc-700 text-zinc-400"
+                                }`}
+                              >
+                                {getCarTypeBadge(car)}
+                              </button>
                             </div>
 
                             {(isPendingConfirm || isPendingUnconfirm) && (
@@ -707,6 +764,55 @@ export default function TrackDetail() {
           trackId={track.id}
           onClose={() => setShowAddModal(false)}
         />
+      )}
+
+      {/* Tank Type Quick Edit Popover */}
+      {tankTypeEditCar && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[100]">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Tank Type</h2>
+              <button
+                onClick={() => setTankTypeEditCar(null)}
+                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-6 h-6 text-zinc-400" />
+              </button>
+            </div>
+
+            <p className="text-zinc-400 text-base mb-4">
+              Car: <span className="font-mono font-semibold text-white">{normalizeCarId(tankTypeEditCar.carNumber)}</span>
+            </p>
+
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              {(["C", "A", "HP", "SC"] as const).map(type => (
+                <button
+                  key={type}
+                  onClick={() => handleSaveTankType(type)}
+                  className={`py-4 rounded-lg text-lg font-bold transition-colors ${
+                    tankTypeEditCar.currentType === type
+                      ? "bg-green-600 text-white"
+                      : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs text-zinc-500 mb-6">
+              C=Caustic, A=Acid, HP=Hydrogen Peroxide, SC=Sodium Chlorate
+            </p>
+
+            <button
+              onClick={() => setTankTypeEditCar(null)}
+              className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-base font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Unconfirm Confirmation Dialog */}
@@ -949,10 +1055,9 @@ export default function TrackDetail() {
 function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => void }) {
   const { addCar, tracks, saveTracks } = useApp();
   const [carNumber, setCarNumber] = useState("");
-  const [carType, setCarType] = useState("BOX");
+  const [carType, setCarType] = useState<"BOX" | "TANK" | "FLAT">("BOX");
+  const [tankType, setTankType] = useState<"C" | "A" | "HP" | "SC" | undefined>(undefined);
   const [duplicateInfo, setDuplicateInfo] = useState<{ trackId: string; trackName: string } | null>(null);
-
-  const carTypes = ["BOX", "TANK", "FLAT", "HOPPER", "GONDOLA", "AUTO"];
 
   const normalizedPreview = normalizeCarId(carNumber);
   const isValid = carNumber.trim() && /[a-zA-Z]/.test(carNumber) && /[0-9]/.test(carNumber);
@@ -982,6 +1087,7 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
     addCar(trackId, {
       carNumber: normalizedPreview,
       carType,
+      tankType: carType === "TANK" ? tankType : undefined,
     });
     onClose();
   };
@@ -991,6 +1097,7 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
     addCar(trackId, {
       carNumber: normalizedPreview,
       carType,
+      tankType: carType === "TANK" ? tankType : undefined,
     });
     setDuplicateInfo(null);
     onClose();
@@ -1024,6 +1131,7 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
     addCar(trackId, {
       carNumber: normalizedPreview,
       carType,
+      tankType: carType === "TANK" ? tankType : undefined,
     });
     
     setDuplicateInfo(null);
@@ -1051,7 +1159,7 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
                   value={carNumber}
                   onChange={(e) => setCarNumber(e.target.value)}
                   className="w-full bg-zinc-800 text-white text-2xl font-mono px-4 py-4 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                  placeholder="tbox663566"
+                  placeholder="e.g. TBOX663566"
                   autoFocus
                 />
                 
@@ -1071,11 +1179,16 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
               <div>
                 <label className="block text-zinc-400 mb-2 text-lg">Car Type</label>
                 <div className="grid grid-cols-3 gap-3">
-                  {carTypes.map(type => (
+                  {(["BOX", "TANK", "FLAT"] as const).map(type => (
                     <button
                       key={type}
                       type="button"
-                      onClick={() => setCarType(type)}
+                      onClick={() => {
+                        setCarType(type);
+                        if (type !== "TANK") {
+                          setTankType(undefined);
+                        }
+                      }}
                       className={`py-4 rounded-lg text-lg font-medium transition-colors ${
                         carType === type
                           ? "bg-green-600 text-white"
@@ -1087,6 +1200,38 @@ function AddCarModal({ trackId, onClose }: { trackId: string; onClose: () => voi
                   ))}
                 </div>
               </div>
+
+              {/* Conditional Tank Type Selector */}
+              {carType === "TANK" && (
+                <div>
+                  <label className="block text-zinc-400 mb-2 text-lg">Tank Type</label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {(["C", "A", "HP", "SC"] as const).map(type => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setTankType(type)}
+                        className={`py-4 rounded-lg text-lg font-bold transition-colors ${
+                          tankType === type
+                            ? "bg-green-600 text-white"
+                            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    C=Caustic, A=Acid, HP=Hydrogen Peroxide, SC=Sodium Chlorate
+                  </p>
+                </div>
+              )}
+
+              {carType !== "TANK" && (
+                <p className="text-sm text-zinc-500">
+                  Tank type required only when TANK is selected.
+                </p>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
