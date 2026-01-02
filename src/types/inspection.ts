@@ -3,9 +3,12 @@ export type ReviewStatus = "pending" | "approved" | "rejected";
 
 export interface Inspection {
   id: string;
-  templateId: "gp-rail-car-inspection-v1";
-  status: InspectionStatus;
-  reviewStatus?: ReviewStatus;
+  templateId: string;
+  status: "draft" | "in_progress" | "complete";
+  reviewStatus?: "pending" | "approved" | "rejected";
+  
+  // Current wizard step (1-4)
+  currentStep?: number;
   
   createdAt: string;
   updatedAt: string;
@@ -15,7 +18,7 @@ export interface Inspection {
   houseCode?: string;
   carNumber?: string;
   site?: string;
-  startedAt: string;
+  startedAt?: string;
   
   // Legacy fields (keep for backwards compatibility)
   siteConducted?: string;

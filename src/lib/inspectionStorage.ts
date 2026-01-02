@@ -3,6 +3,9 @@ import { Inspection } from "@/types/inspection";
 const STORAGE_KEY = "gp_inspections_v1";
 const APPROVED_STORAGE_KEY = "gp_approved_inspections_v1";
 
+// Debounce helper for auto-save
+let saveTimeout: NodeJS.Timeout | null = null;
+
 /**
  * Migrate old inspection format to new dual signature format
  * Backwards compatibility for inspections created before dual signature implementation
@@ -23,13 +26,16 @@ function migrateInspection(inspection: any): Inspection {
       inspectorSignature: undefined,
       // Add reviewStatus default
       reviewStatus: inspection.reviewStatus || "pending",
+      // Add currentStep for wizard
+      currentStep: inspection.currentStep || 1,
     };
   }
   
-  // Ensure reviewStatus exists
+  // Ensure reviewStatus and currentStep exist
   return {
     ...inspection,
     reviewStatus: inspection.reviewStatus || "pending",
+    currentStep: inspection.currentStep || 1,
   };
 }
 
@@ -69,6 +75,7 @@ export const inspectionStorage = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       reviewStatus: "pending",
+      currentStep: 1,
     };
     
     const inspections = inspectionStorage.getInspections();
@@ -78,12 +85,20 @@ export const inspectionStorage = {
     return newInspection;
   },
 
+  /**
+   * Update inspection - CRITICAL: Preserves all existing fields
+   * Uses shallow merge to update only specified fields
+   */
   updateInspection: (id: string, updates: Partial<Inspection>) => {
     const inspections = inspectionStorage.getInspections();
     const index = inspections.findIndex(i => i.id === id);
     
-    if (index === -1) return;
+    if (index === -1) {
+      console.error(`[InspectionStorage] Inspection ${id} not found`);
+      return;
+    }
     
+    // CRITICAL: Shallow merge preserves all existing fields
     inspections[index] = {
       ...inspections[index],
       ...updates,
@@ -96,6 +111,20 @@ export const inspectionStorage = {
     }
     
     inspectionStorage.saveInspections(inspections);
+  },
+
+  /**
+   * Debounced update for auto-save on field changes
+   * Prevents excessive localStorage writes
+   */
+  updateInspectionDebounced: (id: string, updates: Partial<Inspection>, delay = 300) => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+    
+    saveTimeout = setTimeout(() => {
+      inspectionStorage.updateInspection(id, updates);
+    }, delay);
   },
 
   deleteInspection: (id: string) => {
@@ -154,7 +183,7 @@ export const inspectionStorage = {
     inspections[index] = {
       ...inspections[index],
       reviewStatus: "rejected",
-      status: "in_progress", // Send back to in-progress
+      status: "in_progress",
       managerNote,
       updatedAt: new Date().toISOString(),
     };

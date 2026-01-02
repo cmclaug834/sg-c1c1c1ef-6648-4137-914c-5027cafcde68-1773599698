@@ -12,7 +12,7 @@ export default function NewInspection() {
   const { currentUser } = useApp();
   const [mounted, setMounted] = useState(false);
   
-  // Form State (NEW STRUCTURE)
+  // Form State
   const [site, setSite] = useState("");
   const [houseCode, setHouseCode] = useState("");
   const [carNumber, setCarNumber] = useState("");
@@ -21,6 +21,7 @@ export default function NewInspection() {
   // Sheet State
   const [showSiteSheet, setShowSiteSheet] = useState(false);
   const [showHouseSheet, setShowHouseSheet] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -38,19 +39,30 @@ export default function NewInspection() {
 
   if (!mounted || !currentUser) return null;
 
+  const handleBack = () => {
+    setShowExitDialog(true);
+  };
+
+  const handleConfirmExit = () => {
+    router.push("/inspections");
+  };
+
   const handleNext = () => {
-    // Create the inspection record with NEW structure
+    if (!site || !carNumber) return;
+
+    // Create the inspection with step 1
     const newInspection = inspectionStorage.createInspection({
       templateId: "gp-rail-car-inspection-v1",
       status: "draft",
+      currentStep: 1,
       
-      // NEW FIELDS
+      // Title page fields
       houseCode,
       carNumber,
       site,
       startedAt: new Date().toISOString(),
       
-      // Keep legacy fields for backwards compatibility
+      // Legacy fields for backwards compatibility
       siteConducted: site,
       dateTime,
       houseNumber: houseCode,
@@ -59,7 +71,7 @@ export default function NewInspection() {
       media: {},
     });
 
-    // Navigate to Page 1
+    // Navigate to wizard step 1
     router.push(`/inspection/${newInspection.id}/page/1`);
   };
 
@@ -71,7 +83,7 @@ export default function NewInspection() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-6 h-6" />
@@ -177,6 +189,32 @@ export default function NewInspection() {
           )}
         </div>
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      {showExitDialog && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border-2 border-zinc-800 p-6">
+            <h3 className="text-xl font-bold mb-2">Exit Inspection?</h3>
+            <p className="text-zinc-400 mb-6">
+              You haven't started the inspection yet. Are you sure you want to exit?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitDialog(false)}
+                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmExit}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Site Selection Sheet */}
       {showSiteSheet && (
