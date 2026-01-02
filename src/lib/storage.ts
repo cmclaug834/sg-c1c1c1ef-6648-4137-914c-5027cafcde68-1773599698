@@ -10,12 +10,19 @@ const STORAGE_KEYS = {
   SESSION_EXPIRES_AT: "rail_yard_session_expires_at",
   SHIFT_A: "rail_yard_shift_a",
   SHIFT_B: "rail_yard_shift_b",
+  REFERENCE_DATA: "rail_yard_reference_data",
 };
 
 export interface ActiveCrew {
   name: string;
   crewId: string;
   startedAt: string;
+}
+
+export interface ReferenceData {
+  sites: string[];
+  houseCodes: string[];
+  updatedAt: string;
 }
 
 export const storage = {
@@ -233,6 +240,31 @@ export const storage = {
       console.error("[Storage] Failed to save shift times:", error);
     }
   },
+
+  getReferenceData: (): ReferenceData => {
+    if (typeof window === "undefined") {
+      return getDefaultReferenceData();
+    }
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.REFERENCE_DATA);
+      if (!data) {
+        return getDefaultReferenceData();
+      }
+      return JSON.parse(data);
+    } catch (error) {
+      console.warn("[Storage] Failed to parse reference data, returning defaults:", error);
+      return getDefaultReferenceData();
+    }
+  },
+
+  saveReferenceData: (data: ReferenceData) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.REFERENCE_DATA, JSON.stringify(data));
+    } catch (error) {
+      console.error("[Storage] Failed to save reference data:", error);
+    }
+  },
 };
 
 function getInitialTracks(): Track[] {
@@ -322,4 +354,12 @@ function getInitialTracks(): Track[] {
       enabled: true,
     },
   ];
+}
+
+function getDefaultReferenceData(): ReferenceData {
+  return {
+    sites: ["CCF", "CI IF", "FM", "FR", "GMF", "GP", "NB"],
+    houseCodes: ["H2-1", "H2-2", "H2-3", "H1-1", "H1-2", "H1-3"],
+    updatedAt: new Date().toISOString(),
+  };
 }

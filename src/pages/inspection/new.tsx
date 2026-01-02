@@ -1,16 +1,17 @@
 import { useRouter } from "next/router";
-import { ArrowLeft, Calendar, ChevronDown, ScanBarcode } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, ScanBarcode, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
+import { storage } from "@/lib/storage";
 import { useApp } from "@/contexts/AppContext";
-
-const SITE_OPTIONS = ["CCF", "CI IF", "FM", "FR", "GMF", "GP", "NB"];
-const HOUSE_OPTIONS = ["H2-1", "H2-2", "H2-3", "H1-1", "H1-2", "H1-3"];
 
 export default function NewInspection() {
   const router = useRouter();
   const { currentUser } = useApp();
   const [mounted, setMounted] = useState(false);
+  
+  // Load reference data
+  const [referenceData, setReferenceData] = useState(storage.getReferenceData());
   
   // Form State
   const [site, setSite] = useState("");
@@ -50,19 +51,16 @@ export default function NewInspection() {
   const handleNext = () => {
     if (!site || !carNumber) return;
 
-    // Create the inspection with step 1
     const newInspection = inspectionStorage.createInspection({
       templateId: "gp-rail-car-inspection-v1",
       status: "draft",
       currentStep: 1,
       
-      // Title page fields
       houseCode,
       carNumber,
       site,
       startedAt: new Date().toISOString(),
       
-      // Legacy fields for backwards compatibility
       siteConducted: site,
       dateTime,
       houseNumber: houseCode,
@@ -71,11 +69,18 @@ export default function NewInspection() {
       media: {},
     });
 
-    // Navigate to wizard step 1
     router.push(`/inspection/${newInspection.id}/page/1`);
   };
 
   const canProceed = site && carNumber;
+
+  const siteOptions = referenceData.sites.length > 0 
+    ? referenceData.sites 
+    : ["CCF", "CI IF", "FM", "FR", "GMF", "GP", "NB"];
+
+  const houseOptions = referenceData.houseCodes.length > 0
+    ? referenceData.houseCodes
+    : ["H2-1", "H2-2", "H2-3", "H1-1", "H1-2", "H1-3"];
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white pb-20">
@@ -222,8 +227,21 @@ export default function NewInspection() {
           <div className="bg-zinc-900 rounded-t-3xl w-full max-w-2xl border-t-2 border-zinc-800 p-6 animate-slide-up max-h-[80vh] overflow-y-auto">
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6 flex-shrink-0" />
             <h3 className="text-xl font-bold mb-4">Select Site</h3>
+            
+            {siteOptions.length === 0 && (
+              <div className="bg-amber-600/20 border border-amber-600/50 rounded-lg p-4 mb-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-amber-400 text-sm font-medium mb-1">No sites configured</p>
+                  <p className="text-amber-400/80 text-xs">
+                    An admin needs to add site codes in Inspection Admin → Reference Lists
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-2">
-              {SITE_OPTIONS.map((siteOption) => (
+              {siteOptions.map((siteOption) => (
                 <button
                   key={siteOption}
                   onClick={() => {
@@ -256,8 +274,21 @@ export default function NewInspection() {
           <div className="bg-zinc-900 rounded-t-3xl w-full max-w-2xl border-t-2 border-zinc-800 p-6 animate-slide-up max-h-[80vh] overflow-y-auto">
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6 flex-shrink-0" />
             <h3 className="text-xl font-bold mb-4">Select House Code</h3>
+            
+            {houseOptions.length === 0 && (
+              <div className="bg-amber-600/20 border border-amber-600/50 rounded-lg p-4 mb-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-amber-400 text-sm font-medium mb-1">No house codes configured</p>
+                  <p className="text-amber-400/80 text-xs">
+                    An admin needs to add house codes in Inspection Admin → Reference Lists
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-2">
-              {HOUSE_OPTIONS.map((house) => (
+              {houseOptions.map((house) => (
                 <button
                   key={house}
                   onClick={() => {

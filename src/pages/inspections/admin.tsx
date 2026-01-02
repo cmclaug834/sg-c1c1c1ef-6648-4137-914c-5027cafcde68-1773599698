@@ -1,8 +1,9 @@
 import { useRouter } from "next/router";
-import { ArrowLeft, Trash2, AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowLeft, Trash2, AlertTriangle, ChevronUp, ChevronDown, Plus, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { inspectionConfigStorage } from "@/lib/inspectionConfig";
+import { storage, ReferenceData } from "@/lib/storage";
 import { Inspection, InspectionFormConfig } from "@/types/inspection";
 import { useApp } from "@/contexts/AppContext";
 
@@ -13,9 +14,17 @@ export default function InspectionAdmin() {
   const [mounted, setMounted] = useState(false);
   const [drafts, setDrafts] = useState<Inspection[]>([]);
   const [config, setConfig] = useState<InspectionFormConfig | null>(null);
+  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<"drafts" | "config">("drafts");
+  const [activeTab, setActiveTab] = useState<"drafts" | "config" | "reference">("drafts");
+  
+  // Reference data editing state
+  const [newSite, setNewSite] = useState("");
+  const [newHouseCode, setNewHouseCode] = useState("");
+  const [siteError, setSiteError] = useState("");
+  const [houseError, setHouseError] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "site" | "house"; value: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -38,9 +47,10 @@ export default function InspectionAdmin() {
     );
     setDrafts(inProgress);
     setConfig(inspectionConfigStorage.getConfig());
+    setReferenceData(storage.getReferenceData());
   };
 
-  if (!mounted || !currentUser || !config) {
+  if (!mounted || !currentUser || !config || !referenceData) {
     return null;
   }
 
@@ -88,7 +98,6 @@ export default function InspectionAdmin() {
     
     const newIndex = direction === "up" ? index - 1 : index + 1;
     
-    // Swap orders
     const temp = sortedSections[index].order;
     sortedSections[index].order = sortedSections[newIndex].order;
     sortedSections[newIndex].order = temp;
@@ -110,6 +119,107 @@ export default function InspectionAdmin() {
     const defaultConfig = inspectionConfigStorage.resetToDefault();
     setConfig(defaultConfig);
     alert("Form configuration reset to defaults");
+  };
+
+  // Reference data handlers
+  const validateSite = (value: string): string | null => {
+    const trimmed = value.trim().toUpperCase();
+    
+    if (!trimmed) {
+      return "Site code cannot be empty";
+    }
+    
+    if (!/^[A-Z0-9\s-]+$/.test(trimmed)) {
+      return "Site code can only contain letters, numbers, spaces, and hyphens";
+    }
+    
+    if (referenceData.sites.some(s => s.toUpperCase() === trimmed)) {
+      return "Site code already exists";
+    }
+    
+    return null;
+  };
+
+  const validateHouseCode = (value: string): string | null => {
+    const trimmed = value.trim().toUpperCase();
+    
+    if (!trimmed) {
+      return "House code cannot be empty";
+    }
+    
+    if (!/^[A-Z0-9\s-]+$/.test(trimmed)) {
+      return "House code can only contain letters, numbers, spaces, and hyphens";
+    }
+    
+    if (referenceData.houseCodes.some(h => h.toUpperCase() === trimmed)) {
+      return "House code already exists";
+    }
+    
+    return null;
+  };
+
+  const handleAddSite = () => {
+    const error = validateSite(newSite);
+    if (error) {
+      setSiteError(error);
+      return;
+    }
+    
+    const trimmed = newSite.trim().toUpperCase();
+    const updated: ReferenceData = {
+      ...referenceData,
+      sites: [...referenceData.sites, trimmed].sort(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    storage.saveReferenceData(updated);
+    setReferenceData(updated);
+    setNewSite("");
+    setSiteError("");
+  };
+
+  const handleAddHouseCode = () => {
+    const error = validateHouseCode(newHouseCode);
+    if (error) {
+      setHouseError(error);
+      return;
+    }
+    
+    const trimmed = newHouseCode.trim().toUpperCase();
+    const updated: ReferenceData = {
+      ...referenceData,
+      houseCodes: [...referenceData.houseCodes, trimmed].sort(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    storage.saveReferenceData(updated);
+    setReferenceData(updated);
+    setNewHouseCode("");
+    setHouseError("");
+  };
+
+  const handleDeleteSite = (site: string) => {
+    const updated: ReferenceData = {
+      ...referenceData,
+      sites: referenceData.sites.filter(s => s !== site),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    storage.saveReferenceData(updated);
+    setReferenceData(updated);
+    setDeleteConfirm(null);
+  };
+
+  const handleDeleteHouseCode = (houseCode: string) => {
+    const updated: ReferenceData = {
+      ...referenceData,
+      houseCodes: referenceData.houseCodes.filter(h => h !== houseCode),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    storage.saveReferenceData(updated);
+    setReferenceData(updated);
+    setDeleteConfirm(null);
   };
 
   const formatTimestamp = (isoString: string) => {
@@ -160,12 +270,21 @@ export default function InspectionAdmin() {
           >
             Form Config
           </button>
+          <button
+            onClick={() => setActiveTab("reference")}
+            className={`flex-1 py-3 px-4 rounded-lg text-base font-medium transition-colors ${
+              activeTab === "reference"
+                ? "bg-green-600 text-white"
+                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+            }`}
+          >
+            Reference Lists
+          </button>
         </div>
 
         {/* Content */}
         {activeTab === "drafts" ? (
           <div className="space-y-6">
-            {/* Clear All Button */}
             {drafts.length > 0 && (
               <button
                 onClick={() => setShowClearAllDialog(true)}
@@ -176,7 +295,6 @@ export default function InspectionAdmin() {
               </button>
             )}
 
-            {/* Draft List */}
             {drafts.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-xl text-zinc-400">No drafts or in-progress forms</p>
@@ -215,9 +333,8 @@ export default function InspectionAdmin() {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "config" ? (
           <div className="space-y-6">
-            {/* Form Builder Controls */}
             <div className="bg-zinc-800 p-5 rounded-xl">
               <h2 className="text-lg font-bold mb-4">Form Sections</h2>
               <p className="text-sm text-zinc-400 mb-4">
@@ -233,7 +350,6 @@ export default function InspectionAdmin() {
                       className="bg-zinc-900 p-4 rounded-lg"
                     >
                       <div className="flex items-center gap-3">
-                        {/* Move buttons */}
                         <div className="flex flex-col gap-1">
                           <button
                             onClick={() => handleMoveSection(section.id, "up")}
@@ -259,16 +375,13 @@ export default function InspectionAdmin() {
                           </button>
                         </div>
 
-                        {/* Section label */}
                         <div className="flex-1">
                           <div className="text-base font-medium">
                             {section.label}
                           </div>
                         </div>
 
-                        {/* Toggles */}
                         <div className="flex items-center gap-4">
-                          {/* Required toggle */}
                           <button
                             onClick={() => handleToggleRequired(section.id)}
                             disabled={!section.enabled}
@@ -283,7 +396,6 @@ export default function InspectionAdmin() {
                             {section.required ? "Required" : "Optional"}
                           </button>
 
-                          {/* Enabled toggle */}
                           <button
                             onClick={() => handleToggleSection(section.id)}
                             className={`w-12 h-7 rounded-full transition-colors relative ${
@@ -301,7 +413,6 @@ export default function InspectionAdmin() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
                 onClick={handleResetConfig}
@@ -315,6 +426,135 @@ export default function InspectionAdmin() {
               >
                 Save Config
               </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Site IDs Card */}
+            <div className="bg-zinc-800 p-5 rounded-xl">
+              <h2 className="text-lg font-bold mb-4">Site IDs</h2>
+              <p className="text-sm text-zinc-400 mb-4">
+                Manage the list of site codes available in inspection forms
+              </p>
+
+              {/* Add Site Input */}
+              <div className="mb-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSite}
+                    onChange={(e) => {
+                      setNewSite(e.target.value);
+                      setSiteError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddSite();
+                      }
+                    }}
+                    placeholder="Enter site code..."
+                    className="flex-1 bg-zinc-900 text-white px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleAddSite}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Site
+                  </button>
+                </div>
+                {siteError && (
+                  <p className="text-red-400 text-sm mt-2">{siteError}</p>
+                )}
+              </div>
+
+              {/* Site List */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {referenceData.sites.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-4">No sites configured</p>
+                ) : (
+                  referenceData.sites.map(site => (
+                    <div
+                      key={site}
+                      className="bg-zinc-900 p-3 rounded-lg flex items-center justify-between"
+                    >
+                      <span className="font-mono text-lg">{site}</span>
+                      <button
+                        onClick={() => setDeleteConfirm({ type: "site", value: site })}
+                        className="p-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* House Codes Card */}
+            <div className="bg-zinc-800 p-5 rounded-xl">
+              <h2 className="text-lg font-bold mb-4">House Codes</h2>
+              <p className="text-sm text-zinc-400 mb-4">
+                Manage the list of house codes available in inspection forms
+              </p>
+
+              {/* Add House Code Input */}
+              <div className="mb-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newHouseCode}
+                    onChange={(e) => {
+                      setNewHouseCode(e.target.value);
+                      setHouseError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddHouseCode();
+                      }
+                    }}
+                    placeholder="Enter house code..."
+                    className="flex-1 bg-zinc-900 text-white px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleAddHouseCode}
+                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Code
+                  </button>
+                </div>
+                {houseError && (
+                  <p className="text-red-400 text-sm mt-2">{houseError}</p>
+                )}
+              </div>
+
+              {/* House Code List */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {referenceData.houseCodes.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-4">No house codes configured</p>
+                ) : (
+                  referenceData.houseCodes.map(code => (
+                    <div
+                      key={code}
+                      className="bg-zinc-900 p-3 rounded-lg flex items-center justify-between"
+                    >
+                      <span className="font-mono text-lg">{code}</span>
+                      <button
+                        onClick={() => setDeleteConfirm({ type: "house", value: code })}
+                        className="p-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Last Updated Info */}
+            <div className="text-center text-sm text-zinc-500">
+              Last updated: {formatTimestamp(referenceData.updatedAt)}
             </div>
           </div>
         )}
@@ -372,6 +612,43 @@ export default function InspectionAdmin() {
                 className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
               >
                 Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Reference Data Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
+            <h2 className="text-2xl font-bold mb-4">
+              Remove {deleteConfirm.type === "site" ? "Site" : "House Code"}?
+            </h2>
+            <p className="text-zinc-400 text-lg mb-2">
+              Remove <span className="font-mono font-bold text-white">{deleteConfirm.value}</span> from the list?
+            </p>
+            <p className="text-sm text-zinc-500 mb-6">
+              This won't delete past inspections that used this value.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (deleteConfirm.type === "site") {
+                    handleDeleteSite(deleteConfirm.value);
+                  } else {
+                    handleDeleteHouseCode(deleteConfirm.value);
+                  }
+                }}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
+              >
+                Remove
               </button>
             </div>
           </div>
