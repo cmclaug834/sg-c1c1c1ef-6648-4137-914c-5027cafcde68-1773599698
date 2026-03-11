@@ -13,13 +13,14 @@
 
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, BadgeCheck, CircleDashed, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MoreVertical, Trash2, ArrowUpDown, BadgeCheck, CircleDashed, X, Plus, Search, Copy, Check } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { UnconfirmDialog } from "@/components/UnconfirmDialog";
 import { normalizeCarId } from "@/lib/carIdFormatter";
 import { DuplicateCarDialog } from "@/components/DuplicateCarDialog";
 import { logDiagnostic } from "@/lib/diagnostics";
 import { RailCar } from "@/types";
+import { inspectionStorage } from "@/lib/inspectionStorage";
 
 const BOTTOM_BAR_H = 96;
 
@@ -354,6 +355,20 @@ export default function TrackDetail() {
     setTankTypeEditCar(null);
     setMoveToast(`Tank type set to ${newTankType}`);
     setTimeout(() => setMoveToast(null), 2000);
+  };
+
+  const handleStartInspection = (car: { carNumber: string }) => {
+    if (!currentUser) return;
+    
+    // Create new inspection with car pre-filled
+    const newInspection = inspectionStorage.createInspection({
+      inspectorName: currentUser.name,
+      vehicleId: car.carNumber,
+      currentStep: 1,
+    });
+
+    // Navigate to inspection form
+    router.push(`/inspection/${newInspection.id}/page/1`);
   };
 
   // Handle back button with pending changes check
@@ -893,6 +908,29 @@ export default function TrackDetail() {
               >
                 <Trash2 className="w-5 h-5 text-red-500" />
                 <span>Remove from this track</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartInspection(carActionMenu);
+                  setCarActionMenu(null);
+                }}
+                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium text-left px-4 transition-colors flex items-center gap-3"
+              >
+                <Check className="w-5 h-5 text-green-500" />
+                <span>Start Inspection</span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteCar(carActionMenu.carId);
+                  setCarActionMenu(null);
+                }}
+                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium text-left px-4 transition-colors flex items-center gap-3"
+              >
+                <Trash2 className="w-5 h-5 text-destructive" />
+                <span>Delete</span>
               </button>
             </div>
 
