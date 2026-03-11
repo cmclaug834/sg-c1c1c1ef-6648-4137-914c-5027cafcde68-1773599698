@@ -351,7 +351,7 @@ export default function InspectionPage1() {
               </button>
 
               {showAcceptRejectMediaMenu && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
+                <div className="fixed inset-x-4 bottom-24 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50 max-w-2xl mx-auto">
                   <button
                     onClick={handleAcceptRejectAddPhotos}
                     className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left"
