@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection } from "@/types/inspection";
 import { useApp } from "@/contexts/AppContext";
+import { cn } from "@/lib/utils";
 import {
   X,
   ChevronLeft,
@@ -35,6 +36,8 @@ export default function InspectionPage1() {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [showAcceptRejectMediaMenu, setShowAcceptRejectMediaMenu] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [noteText, setNoteText] = useState("");
   const [mounted, setMounted] = useState(false);
 
   const mediaMenuRef = useRef<HTMLDivElement>(null);
@@ -79,9 +82,10 @@ export default function InspectionPage1() {
         setInspection(loaded);
         setAcceptReject(loaded.acceptReject);
         setRejectReason(loaded.rejectReason || "");
+        setNoteText(Array.isArray(loaded.notes) ? loaded.notes.join('\n') : (loaded.notes || ""));
       }
     }
-  }, [mounted, id, currentUser, router]);
+  }, [id, mounted]);
 
   if (!mounted || !currentUser || !inspection) {
     return null;
@@ -243,8 +247,8 @@ export default function InspectionPage1() {
   const handleAcceptRejectFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      // TODO: Process files for Accept/Reject section
-      console.log("Accept/Reject media files:", files);
+      console.log("Accept/Reject files selected:", files);
+      // TODO: Handle file upload
     }
     if (acceptRejectFileInputRef.current) {
       acceptRejectFileInputRef.current.value = "";
@@ -258,6 +262,18 @@ export default function InspectionPage1() {
     } else {
       handleFieldUpdate("acceptReject", "no");
     }
+  };
+
+  const handleSaveNote = () => {
+    handleFieldUpdate("notes", noteText ? [noteText] : []);
+    setShowNoteDialog(false);
+  };
+
+  const handleCancelNote = () => {
+    // Restore previous note value
+    const inspection = inspectionStorage.getInspection(id as string);
+    setNoteText(inspection?.notes ? (Array.isArray(inspection.notes) ? inspection.notes.join('\n') : inspection.notes) : "");
+    setShowNoteDialog(false);
   };
 
   return (
@@ -418,13 +434,12 @@ export default function InspectionPage1() {
           </div>
 
           {/* Action Buttons Row */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-3">
             <button
-              type="button"
-              onClick={() => handleActionStub("Add note")}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+              onClick={() => setShowNoteDialog(true)}
+              className="flex-1 bg-zinc-700 text-white py-3 px-4 rounded-lg font-medium hover:bg-zinc-600 transition-colors"
             >
-              Add note
+              ADD NOTE
             </button>
             <button
               type="button"
@@ -507,27 +522,50 @@ export default function InspectionPage1() {
         </div>
 
         {/* Next Button */}
-        <div className="mt-12">
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!canProceed}
-            className={`w-full py-4 rounded-lg text-lg font-bold transition-colors ${
-              canProceed
-                ? "bg-green-600 hover:bg-green-700 text-white"
-                : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-            }`}
-          >
-            Next
-          </button>
-          {!canProceed && (
-            <p className="text-center text-sm text-zinc-500 mt-2">
-              {!acceptReject && "Select Accept or Reject"}
-              {acceptReject === "no" && !rejectReason && "Select a reject reason"}
-              {acceptReject && (acceptReject === "yes" || rejectReason) && !inspection.inspectorSignatures?.initial?.signatureDataUrl && "Add initial signature to continue"}
-            </p>
+        <button
+          onClick={handleNext}
+          disabled={!canProceed}
+          className={cn(
+            "w-full py-4 rounded-lg font-semibold text-lg transition-colors mb-20",
+            canProceed
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-zinc-700 text-zinc-400 cursor-not-allowed"
           )}
-        </div>
+        >
+          Next
+        </button>
+
+        {/* Note Dialog */}
+        {showNoteDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-zinc-900 rounded-lg w-full max-w-lg border border-zinc-700">
+              <div className="p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Add Note</h2>
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Type your additional notes here..."
+                  className="w-full h-40 bg-zinc-800 text-white border border-zinc-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={handleCancelNote}
+                    className="flex-1 bg-zinc-700 text-white py-3 rounded-lg font-medium hover:bg-zinc-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveNote}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Save Note
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Signature Modal (Embedded) */}

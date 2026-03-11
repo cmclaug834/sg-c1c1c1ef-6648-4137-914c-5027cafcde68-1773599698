@@ -15,6 +15,8 @@ export default function InspectionPage2() {
   const [loadNo, setLoadNo] = useState("");
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [showMediaMenu, setShowMediaMenu] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [noteText, setNoteText] = useState("");
   const [mounted, setMounted] = useState(false);
 
   const mediaMenuRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,7 @@ export default function InspectionPage2() {
         setInspection(loaded);
         setIsLoadBalanced(loaded.isLoadBalanced);
         setLoadNo(loaded.loadNo || "");
+        setNoteText(Array.isArray(loaded.notes) ? loaded.notes.join('\n') : (loaded.notes || ""));
       }
     }
   }, [mounted, id, currentUser, router]);
@@ -136,13 +139,27 @@ export default function InspectionPage2() {
     }
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    console.log("Files selected:", Array.from(files));
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      console.log("Files selected:", files);
+      // TODO: Handle file upload
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const handleSaveNote = () => {
+    handleFieldUpdate("notes", noteText ? [noteText] : []);
+    setShowNoteDialog(false);
+  };
+
+  const handleCancelNote = () => {
+    // Restore previous note value
+    const inspection = inspectionStorage.getInspection(id as string);
+    setNoteText(inspection?.notes ? (Array.isArray(inspection.notes) ? inspection.notes.join('\n') : inspection.notes) : "");
+    setShowNoteDialog(false);
   };
 
   const canComplete = 
@@ -221,30 +238,12 @@ export default function InspectionPage2() {
           </div>
 
           {/* Action Buttons Row */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-3 mb-6">
             <button
-              onClick={() => alert("Add note coming soon")}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+              onClick={() => setShowNoteDialog(true)}
+              className="flex-1 bg-zinc-700 text-white py-3 px-4 rounded-lg font-medium hover:bg-zinc-600 transition-colors"
             >
-              Add note
-            </button>
-            <button
-              onClick={() => alert("Media coming soon")}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
-            >
-              Media
-            </button>
-            <button
-              onClick={() => alert("Action coming soon")}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
-            >
-              Action
-            </button>
-            <button
-              onClick={() => alert("History coming soon")}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
-            >
-              History
+              ADD NOTE
             </button>
           </div>
 
@@ -434,7 +433,7 @@ export default function InspectionPage2() {
                   : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
               }`}
             >
-              Complete
+              Complete Inspection
             </button>
           </div>
           {!canComplete && (
@@ -446,6 +445,38 @@ export default function InspectionPage2() {
           )}
         </div>
       </div>
+
+      {/* Note Dialog */}
+      {showNoteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg w-full max-w-lg border border-zinc-700">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Add Note</h2>
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Type your additional notes here..."
+                className="w-full h-40 bg-zinc-800 text-white border border-zinc-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={handleCancelNote}
+                  className="flex-1 bg-zinc-700 text-white py-3 rounded-lg font-medium hover:bg-zinc-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveNote}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Signature Modal */}
       {showSignatureModal && (
