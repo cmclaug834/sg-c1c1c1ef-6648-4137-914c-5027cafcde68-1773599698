@@ -44,6 +44,9 @@ export default function TrackDetail() {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [commitToast, setCommitToast] = useState<string | null>(null);
 
+  // Pending moves tracking
+  const [pendingMoves, setPendingMoves] = useState<Map<string, { targetTrackId: string; targetTrackName: string }>>(new Map());
+
   // Multi-select mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedCarIds, setSelectedCarIds] = useState<Set<string>>(new Set());
@@ -56,6 +59,7 @@ export default function TrackDetail() {
   useEffect(() => {
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
+    setPendingMoves(new Map());
     setSelectedCarIds(new Set());
     setSelectionMode(false);
   }, [id]);
@@ -73,7 +77,7 @@ export default function TrackDetail() {
   const computedConfirmed = track.cars.filter(c => c.status === "confirmed").length;
 
   // Check if there are pending changes
-  const hasPendingChanges = pendingConfirmations.size > 0 || pendingUnconfirmations.size > 0;
+  const hasPendingChanges = pendingConfirmations.size > 0 || pendingUnconfirmations.size > 0 || pendingMoves.size > 0;
 
   // Determine if car was checked this shift (for filtering)
   const isCheckedThisShift = (car: RailCar) => {
@@ -81,6 +85,16 @@ export default function TrackDetail() {
     if (!car.confirmedAt) return false;
     if (!track.lastCheckClearedAt) return true;
     return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt);
+  };
+
+  // Check if car was confirmed TODAY (calendar day)
+  const isConfirmedToday = (car: RailCar) => {
+    if (car.status !== "confirmed" || !car.confirmedAt) return false;
+    
+    const confirmedDate = new Date(car.confirmedAt).toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    return confirmedDate === today;
   };
 
   // SMALL left status icon - PERSISTENT STATE (uses car.status)
@@ -107,34 +121,28 @@ export default function TrackDetail() {
       return;
     }
 
-    // Determine current effective status
+    const car = track.cars.find(c => c.id === carId);
+    if (!car) return;
+
+    // If car is already confirmed TODAY, open move picker instead
+    if (isConfirmedToday(car)) {
+      setMovePickerCar({ carId, carNumber });
+      return;
+    }
+
+    // Otherwise, handle as new confirmation
     const isPendingConfirm = pendingConfirmations.has(carId);
-    const isPendingUnconfirm = pendingUnconfirmations.has(carId);
-    const isConfirmed = currentStatus === "confirmed";
 
-    // Effective status considering pending changes
-    const effectivelyConfirmed = (isConfirmed && !isPendingUnconfirm) || isPendingConfirm;
-
-    if (effectivelyConfirmed) {
-      // Handle unconfirm
-      if (settings.requireUnconfirmDialog) {
-        setUnconfirmDialogCar({ trackId: track.id, carId, carNumber });
-      } else {
-        setPendingUnconfirmations(prev => new Set(prev).add(carId));
-        setPendingConfirmations(prev => {
-          const next = new Set(prev);
-          next.delete(carId);
-          return next;
-        });
-      }
-    } else {
-      // Handle confirm
-      setPendingConfirmations(prev => new Set(prev).add(carId));
-      setPendingUnconfirmations(prev => {
+    if (isPendingConfirm) {
+      // Remove from pending confirmations
+      setPendingConfirmations(prev => {
         const next = new Set(prev);
         next.delete(carId);
         return next;
       });
+    } else {
+      // Add to pending confirmations
+      setPendingConfirmations(prev => new Set(prev).add(carId));
     }
   };
 
@@ -299,16 +307,29 @@ export default function TrackDetail() {
   const handleMoveToTrack = (targetTrackId: string, targetTrackName: string) => {
     if (!movePickerCar) return;
 
-    const success = moveCar(movePickerCar.carId, track.id, targetTrackId, "DAY_MOVE");
-    
-    if (success) {
-      setMoveToast(`Moved to ${targetTrackName}`);
-      setTimeout(() => setMoveToast(null), 3000);
-    } else {
-      setMoveToast(`Cannot move: duplicate or error`);
-      setTimeout(() => setMoveToast(null), 3000);
+    // Check for duplicate in target track
+    const targetTrack = tracks.find(t => t.id === targetTrackId);
+    if (targetTrack) {
+      const normalizedCarNumber = normalizeCarId(movePickerCar.carNumber);
+      const duplicate = targetTrack.cars.find(c => normalizeCarId(c.carNumber) === normalizedCarNumber);
+      
+      if (duplicate) {
+        setMoveToast(`Cannot move: ${targetTrackName} already has this car`);
+        setTimeout(() => setMoveToast(null), 3000);
+        setMovePickerCar(null);
+        return;
+      }
     }
-    
+
+    // Add to pending moves
+    setPendingMoves(prev => {
+      const next = new Map(prev);
+      next.set(movePickerCar.carId, { targetTrackId, targetTrackName });
+      return next;
+    });
+
+    setMoveToast(`Will move to ${targetTrackName} when Done is pressed`);
+    setTimeout(() => setMoveToast(null), 3000);
     setMovePickerCar(null);
   };
 
@@ -348,6 +369,7 @@ export default function TrackDetail() {
   const handleDiscardChanges = () => {
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
+    setPendingMoves(new Map());
     setShowDiscardDialog(false);
     router.push("/tracks");
   };
@@ -360,7 +382,7 @@ export default function TrackDetail() {
       "DONE_COMMIT_START",
       track,
       pendingConfirmations.size,
-      pendingUnconfirmations.size
+      pendingMoves.size
     );
 
     // Apply all pending confirmations
@@ -372,19 +394,23 @@ export default function TrackDetail() {
       "DONE_AFTER_CONFIRMATIONS",
       track,
       pendingConfirmations.size,
-      pendingUnconfirmations.size
+      0
     );
 
-    // Apply all pending unconfirmations
-    pendingUnconfirmations.forEach(carId => {
-      unconfirmCar(track.id, carId);
+    // Apply all pending moves
+    let movedCount = 0;
+    pendingMoves.forEach((moveInfo, carId) => {
+      const success = moveCar(carId, track.id, moveInfo.targetTrackId, "DAY_MOVE");
+      if (success) {
+        movedCount++;
+      }
     });
 
     logDiagnostic(
-      "DONE_AFTER_UNCONFIRMATIONS",
+      "DONE_AFTER_MOVES",
       track,
       0,
-      0
+      movedCount
     );
 
     // Update last checked timestamp
@@ -403,6 +429,7 @@ export default function TrackDetail() {
     // Clear pending changes (this resets BIG circles to grey)
     setPendingConfirmations(new Set());
     setPendingUnconfirmations(new Set());
+    setPendingMoves(new Map());
 
     logDiagnostic(
       "DONE_COMMIT_END",
@@ -412,7 +439,8 @@ export default function TrackDetail() {
     );
 
     // Show success toast
-    setCommitToast(`Yard check saved for ${track.name}`);
+    const moveMessage = movedCount > 0 ? `, ${movedCount} moved` : '';
+    setCommitToast(`Yard check saved for ${track.name}${moveMessage}`);
 
     // Navigate to track list after short delay
     setTimeout(() => {
@@ -489,7 +517,9 @@ export default function TrackDetail() {
             </div>
             {hasPendingChanges && (
               <div className="mt-2 text-sm text-yellow-500">
-                {pendingConfirmations.size + pendingUnconfirmations.size} pending changes
+                {pendingConfirmations.size > 0 && `${pendingConfirmations.size} to confirm`}
+                {pendingConfirmations.size > 0 && pendingMoves.size > 0 && ', '}
+                {pendingMoves.size > 0 && `${pendingMoves.size} to move`}
               </div>
             )}
           </div>
@@ -588,7 +618,6 @@ export default function TrackDetail() {
                             {getSmallStatusIcon(car)}
                           </div>
 
-                          {/* Selection checkbox or BIG confirm circle */}
                           {selectionMode ? (
                             <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-lg border-2 flex items-center justify-center transition-colors ${
                               isSelected
@@ -606,6 +635,8 @@ export default function TrackDetail() {
                             <div className="B.confirmStateIcon flex-shrink-0">
                               {car.status === "missing" ? (
                                 <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-yellow-500" />
+                              ) : pendingMoves.has(car.id) ? (
+                                <ArrowUpDown className="w-8 h-8 md:w-10 md:h-10 text-blue-500" />
                               ) : isPendingConfirm ? (
                                 <CheckCircle2 className="w-8 h-8 md:w-10 md:h-10 text-green-500" />
                               ) : isPendingUnconfirm ? (
@@ -628,13 +659,19 @@ export default function TrackDetail() {
                               </span>
                             </div>
 
-                            {(isPendingConfirm || isPendingUnconfirm) && (
+                            {pendingMoves.has(car.id) && (
+                              <div className="text-blue-500 text-sm md:text-base">
+                                Pending move to: {pendingMoves.get(car.id)?.targetTrackName}
+                              </div>
+                            )}
+
+                            {!pendingMoves.has(car.id) && (isPendingConfirm || isPendingUnconfirm) && (
                               <div className="text-yellow-500 text-sm md:text-base">
                                 Pending: {isPendingConfirm ? "will confirm" : "will unconfirm"}
                               </div>
                             )}
 
-                            {!isPendingConfirm && !isPendingUnconfirm && car.status === "confirmed" && car.confirmedAt && (
+                            {!pendingMoves.has(car.id) && !isPendingConfirm && !isPendingUnconfirm && car.status === "confirmed" && car.confirmedAt && (
                               <div className="B.lastConfirmedText text-zinc-500 text-sm md:text-base">
                                 Confirmed {formatConfirmedTime(car.confirmedAt)}
                                 {car.confirmedBy && ` by ${car.confirmedBy}`}
@@ -1013,7 +1050,7 @@ export default function TrackDetail() {
             </h2>
 
             <p className="text-zinc-400 text-lg mb-2">
-              You have {pendingConfirmations.size + pendingUnconfirmations.size} pending changes that haven't been saved.
+              You have {pendingConfirmations.size + pendingUnconfirmations.size + pendingMoves.size} pending changes that haven't been saved.
             </p>
             
             <p className="text-zinc-500 text-base mb-6">
