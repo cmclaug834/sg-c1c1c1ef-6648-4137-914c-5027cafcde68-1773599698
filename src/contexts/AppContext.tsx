@@ -350,13 +350,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storage.saveUser(user);
   };
 
-  const addTrack = (trackName: string) => {
+  const addTrack = (name: string) => {
     const newTrack: Track = {
       id: `track-${Date.now()}`,
-      name: trackName,
+      name,
+      capacity: 50,
+      order: tracks.length + 1,
       cars: [],
       enabled: true,
     };
+    
     setTracks(prev => [...prev, newTrack]);
   };
 

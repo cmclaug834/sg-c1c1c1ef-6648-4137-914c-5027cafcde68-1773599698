@@ -23,10 +23,25 @@ export interface Track {
   id: string;
   name: string;
   displayName?: string;
+  capacity: number;
   cars: RailCar[];
+  order: number;
+  outboundMode?: "none" | "manual-confirmation"; // For tracks where cars leave site
   lastChecked?: string;
   lastCheckClearedAt?: string;
   enabled?: boolean;
+}
+
+export interface ArchivedCar {
+  id: string;
+  carNumber: string;
+  carType?: string;
+  tankType?: string;
+  archivedAt: string;
+  archivedFrom: string; // track name
+  archivedBy?: string; // crew ID
+  reason: "outbound-departure" | "manual-archive";
+  originalData?: RailCar; // full car data for potential restoration
 }
 
 export interface User {
