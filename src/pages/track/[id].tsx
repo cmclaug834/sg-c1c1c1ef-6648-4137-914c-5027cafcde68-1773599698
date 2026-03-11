@@ -622,26 +622,10 @@ export default function TrackDetail() {
                             </div>
                             
                             <div className="flex items-center gap-2 mb-1">
-                              {/* Car Type Badge */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (car.carType === "TANK") {
-                                    setTankTypeEditCar({
-                                      carId: car.id,
-                                      carNumber: car.carNumber,
-                                      currentType: car.tankType,
-                                    });
-                                  }
-                                }}
-                                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                                  car.carType === "TANK"
-                                    ? "bg-zinc-700 hover:bg-zinc-600 text-zinc-300"
-                                    : "bg-zinc-700 text-zinc-400"
-                                }`}
-                              >
+                              {/* Car Type Badge - Display only, click handler moved outside */}
+                              <span className="px-3 py-1 rounded-full text-sm font-medium bg-zinc-700 text-zinc-300">
                                 {getCarTypeBadge(car)}
-                              </button>
+                              </span>
                             </div>
 
                             {(isPendingConfirm || isPendingUnconfirm) && (
@@ -665,6 +649,26 @@ export default function TrackDetail() {
                           </div>
                         </div>
                       </button>
+
+                      {/* Tank type edit button - Only show for TANK cars, separate from main button */}
+                      {!selectionMode && car.carType === "TANK" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTankTypeEditCar({
+                              carId: car.id,
+                              carNumber: car.carNumber,
+                              currentType: car.tankType,
+                            });
+                          }}
+                          className="p-6 hover:bg-zinc-700 transition-colors border-l border-zinc-700"
+                          aria-label="Edit tank type"
+                        >
+                          <span className="text-sm font-medium text-zinc-400">
+                            {car.tankType || "?"}
+                          </span>
+                        </button>
+                      )}
 
                       {/* Row menu - Hide in selection mode */}
                       {!selectionMode && (
