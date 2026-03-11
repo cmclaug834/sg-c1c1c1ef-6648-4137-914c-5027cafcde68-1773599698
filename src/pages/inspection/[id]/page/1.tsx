@@ -515,9 +515,12 @@ export default function InspectionPage1() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => handleAcceptRejectChange("accept")}
+                onClick={() => {
+                  handleFieldUpdate("acceptReject", "yes");
+                  handleFieldUpdate("rejectReason", "");
+                }}
                 className={`flex-1 py-3 rounded-lg font-medium transition-all ${
-                  acceptReject === "accept"
+                  acceptReject === "yes"
                     ? "bg-green-600 text-white"
                     : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
                 }`}
@@ -526,9 +529,9 @@ export default function InspectionPage1() {
               </button>
               <button
                 type="button"
-                onClick={() => handleAcceptRejectChange("reject")}
+                onClick={() => handleFieldUpdate("acceptReject", "no")}
                 className={`flex-1 py-3 rounded-lg font-medium transition-all ${
-                  acceptReject === "reject"
+                  acceptReject === "no"
                     ? "bg-red-600 text-white"
                     : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
                 }`}
@@ -537,14 +540,14 @@ export default function InspectionPage1() {
               </button>
             </div>
 
-            {acceptReject === "reject" && (
+            {acceptReject === "no" && (
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-zinc-300">
                   Reject Reason *
                 </label>
                 <textarea
                   value={rejectReason}
-                  onChange={(e) => handleRejectReasonChange(e.target.value)}
+                  onChange={(e) => handleFieldUpdate("rejectReason", e.target.value)}
                   placeholder="Enter reason for rejection..."
                   className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
                 />
