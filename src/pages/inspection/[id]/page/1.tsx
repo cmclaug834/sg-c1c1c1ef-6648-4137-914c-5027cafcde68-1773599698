@@ -343,78 +343,75 @@ export default function InspectionPage1() {
             {/* Media Button for Accept/Reject */}
             <div className="relative" ref={acceptRejectMediaMenuRef}>
               <button
-                type="button"
                 onClick={() => setShowAcceptRejectMediaMenu(!showAcceptRejectMediaMenu)}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
                 <Camera className="h-5 w-5" />
                 ADD MEDIA
               </button>
 
               {showAcceptRejectMediaMenu && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
                   <button
-                    type="button"
                     onClick={handleAcceptRejectAddPhotos}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-700 transition-colors text-left"
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left"
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                      <Camera className="h-5 w-5 text-blue-400" />
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Camera className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-white">Add Photos</div>
-                      <div className="text-xs text-zinc-400">Take or select photos</div>
+                    <div>
+                      <div className="font-semibold text-white">Add Photos</div>
+                      <div className="text-sm text-zinc-400">Take or select photos</div>
                     </div>
                   </button>
 
                   <button
-                    type="button"
                     onClick={handleAcceptRejectTakeVideo}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-700 transition-colors text-left"
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left"
                   >
-                    <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                      <Video className="h-5 w-5 text-purple-400" />
+                    <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Video className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-white">Take Video</div>
-                      <div className="text-xs text-zinc-400">Record up to 3 minutes</div>
+                    <div>
+                      <div className="font-semibold text-white">Take Video</div>
+                      <div className="text-sm text-zinc-400">Record up to 3 minutes</div>
                     </div>
                   </button>
 
                   <button
-                    type="button"
                     onClick={handleAcceptRejectInsertFromGallery}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-700 transition-colors text-left"
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left"
                   >
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Images className="h-5 w-5 text-green-400" />
+                    <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Images className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-white">Insert from Gallery</div>
-                      <div className="text-xs text-zinc-400">Choose existing photos</div>
+                    <div>
+                      <div className="font-semibold text-white">Insert from Gallery</div>
+                      <div className="text-sm text-zinc-400">Choose existing photos</div>
                     </div>
                   </button>
 
                   <button
-                    type="button"
                     onClick={handleAcceptRejectAddPDF}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-700 transition-colors text-left border-t border-zinc-700"
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-700"
                   >
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                      <File className="h-5 w-5 text-red-400" />
+                    <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <File className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-white">Add PDF Files</div>
-                      <div className="text-xs text-zinc-400">Upload document files</div>
+                    <div>
+                      <div className="font-semibold text-white">Add PDF Files</div>
+                      <div className="text-sm text-zinc-400">Upload document files</div>
                     </div>
                   </button>
                 </div>
               )}
 
               <input
-                ref={acceptRejectFileInputRef}
                 type="file"
+                ref={acceptRejectFileInputRef}
                 className="hidden"
+                multiple
+                accept="image/*,video/*,application/pdf"
                 onChange={handleAcceptRejectFileChange}
               />
             </div>
@@ -503,54 +500,6 @@ export default function InspectionPage1() {
                 >
                   Tap to sign
                 </button>
-              </div>
-            )}
-          </div>
-
-          {/* Accept or Reject Section */}
-          <div className="bg-zinc-800 rounded-lg p-4 space-y-3">
-            <label className="block text-sm font-medium text-zinc-300">
-              Accept or Reject Car *
-            </label>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  handleFieldUpdate("acceptReject", "yes");
-                  handleFieldUpdate("rejectReason", "");
-                }}
-                className={`flex-1 py-3 rounded-lg font-medium transition-all ${
-                  acceptReject === "yes"
-                    ? "bg-green-600 text-white"
-                    : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
-                }`}
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFieldUpdate("acceptReject", "no")}
-                className={`flex-1 py-3 rounded-lg font-medium transition-all ${
-                  acceptReject === "no"
-                    ? "bg-red-600 text-white"
-                    : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
-                }`}
-              >
-                Reject
-              </button>
-            </div>
-
-            {acceptReject === "no" && (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-zinc-300">
-                  Reject Reason *
-                </label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => handleFieldUpdate("rejectReason", e.target.value)}
-                  placeholder="Enter reason for rejection..."
-                  className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                />
               </div>
             )}
           </div>
