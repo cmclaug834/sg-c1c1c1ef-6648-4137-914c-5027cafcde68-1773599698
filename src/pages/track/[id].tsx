@@ -926,17 +926,6 @@ export default function TrackDetail() {
                 <Check className="w-5 h-5 text-green-500" />
                 <span>Start Inspection</span>
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteCar(carActionMenu.carId);
-                  setCarActionMenu(null);
-                }}
-                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium text-left px-4 transition-colors flex items-center gap-3"
-              >
-                <Trash2 className="w-5 h-5 text-destructive" />
-                <span>Delete</span>
-              </button>
             </div>
 
             <button
