@@ -274,90 +274,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
    * All track lookups now happen inside setTracks callback
    */
   const moveCar = (carId: string, fromTrackId: string, toTrackId: string, reason: "MORNING_RECONCILE" | "DAY_MOVE"): boolean => {
-    if (!currentUser) return false;
-
     let success = false;
-
-    setTracks(prev => {
-      // All reads happen inside this callback - no stale state
-      const fromTrack = prev.find(t => t.id === fromTrackId);
-      const car = fromTrack?.cars.find(c => c.id === carId);
+    
+    setTracks((prevTracks) => {
+      const sourceTrack = prevTracks.find((t) => t.id === fromTrackId);
+      const destTrack = prevTracks.find((t) => t.id === toTrackId);
       
-      if (!fromTrack || !car) {
-        success = false;
-        return prev; // No change
-      }
-
-      const toTrack = prev.find(t => t.id === toTrackId);
-      if (!toTrack) {
-        success = false;
-        return prev; // No change
-      }
-
-      // Duplicate detection using normalized car numbers
-      const normalizedCarNumber = normalizeCarId(car.carNumber);
-      const duplicateExists = toTrack.cars.some(c => normalizeCarId(c.carNumber) === normalizedCarNumber);
+      if (!sourceTrack || !destTrack) return prevTracks;
       
-      if (duplicateExists) {
-        success = false;
-        return prev; // No change
-      }
+      const carToMove = sourceTrack.cars.find((c) => c.id === carId);
+      if (!carToMove) return prevTracks;
 
-      // Create move log entry
-      const moveLog: MoveLog = {
-        id: `move-${Date.now()}`,
-        carId: car.id,
-        carNumber: car.carNumber,
-        fromTrack: fromTrack.name,
-        toTrack: toTrack.name,
-        timestamp: new Date().toISOString(),
-        crewId: currentUser.crewId,
-        reason,
-      };
-
-      // Store move log (localStorage for now)
-      try {
-        const existingLogs = JSON.parse(localStorage.getItem("rail_yard_move_logs") || "[]");
-        localStorage.setItem("rail_yard_move_logs", JSON.stringify([...existingLogs, moveLog]));
-      } catch (error) {
-        console.error("[moveCar] Failed to save move log:", error);
-      }
-
-      // Perform the move atomically
       success = true;
-      return prev.map(track => {
-        // Remove from source track
+
+      const updatedTracks = prevTracks.map((track) => {
         if (track.id === fromTrackId) {
-          const updatedCars = track.cars.filter(c => c.id !== carId);
           return {
             ...track,
-            cars: updatedCars,
+            cars: track.cars.filter((c) => c.id !== carId),
           };
         }
-        
-        // Add to destination track
         if (track.id === toTrackId) {
-          const placement = settings.movePlacement || "append";
-          const movedCar = { 
-            ...car, 
-            status: "pending" as const, 
-            confirmedAt: undefined, 
-            confirmedBy: undefined 
+          // PRESERVE confirmation status when moving
+          const movedCar = {
+            ...carToMove,
+            // Keep status, confirmedAt, confirmedBy intact
           };
-          const updatedCars = placement === "prepend" 
-            ? [movedCar, ...track.cars]
-            : [...track.cars, movedCar];
-          
+
           return {
             ...track,
-            cars: updatedCars,
+            cars: [...track.cars, movedCar],
           };
         }
-        
         return track;
       });
-    });
 
+      // We handle saveTracks differently since we are already inside setTracks
+      setTimeout(() => storage.saveTracks(updatedTracks), 0);
+      return updatedTracks;
+    });
+    
     return success;
   };
 
