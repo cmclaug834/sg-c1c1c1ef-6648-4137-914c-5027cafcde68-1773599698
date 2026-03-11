@@ -154,11 +154,6 @@ export default function InspectionPage1() {
 
   const score = getCompletionScore();
 
-  const handleRejectReasonChange = (value: string) => {
-    setRejectReason(value);
-    updateInspectionDebounced(inspectionId, { rejectReason: value });
-  };
-
   const handleAddPhotos = () => {
     setShowMediaMenu(false);
     // Trigger file input for photos
