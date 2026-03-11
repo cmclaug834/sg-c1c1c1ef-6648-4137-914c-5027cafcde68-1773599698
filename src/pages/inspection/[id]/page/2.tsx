@@ -42,11 +42,8 @@ export default function InspectionPage2() {
   }
 
   const handleBack = () => {
-    // Go back to step 1
-    inspectionStorage.updateInspection(inspection.id, {
-      currentStep: 1,
-    });
-    router.push(`/inspection/${inspection.id}/page/1`);
+    // Exit form back to main list
+    router.push("/inspections");
   };
 
   const handleFieldUpdate = (field: string, value: any) => {
@@ -73,11 +70,8 @@ export default function InspectionPage2() {
       return;
     }
 
-    // Mark as complete
-    inspectionStorage.updateInspection(inspection.id, {
-      status: "complete",
-      currentStep: 4,
-    });
+    // Mark as complete and move to archive
+    inspectionStorage.archiveCompletedInspection(inspection.id);
 
     router.push("/inspections");
   };
@@ -284,17 +278,28 @@ export default function InspectionPage2() {
 
         {/* Complete Button */}
         <div className="mt-12">
-          <button
-            onClick={handleComplete}
-            disabled={!canComplete}
-            className={`w-full py-4 rounded-lg text-lg font-bold transition-colors ${
-              canComplete
-                ? "bg-green-600 hover:bg-green-700 text-white"
-                : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-            }`}
-          >
-            Complete Inspection
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                inspectionStorage.updateInspection(inspection.id, { currentStep: 1 });
+                router.push(`/inspection/${inspection.id}/page/1`);
+              }}
+              className="w-1/3 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-bold transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              onClick={handleComplete}
+              disabled={!canComplete}
+              className={`w-2/3 py-4 rounded-lg text-lg font-bold transition-colors ${
+                canComplete
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+              }`}
+            >
+              Complete
+            </button>
+          </div>
           {!canComplete && (
             <p className="text-center text-sm text-zinc-500 mt-2">
               {!isLoadBalanced && "Answer load balanced question"}

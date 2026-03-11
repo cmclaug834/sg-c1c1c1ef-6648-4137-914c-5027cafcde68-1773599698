@@ -32,6 +32,7 @@ interface SortableTrackItemProps {
   onTrackCodeChange: (trackId: string, newCode: string) => void;
   onDisplayNameChange: (trackId: string, newDisplayName: string) => void;
   onToggleEnabled: (trackId: string) => void;
+  onToggleOutbound: (trackId: string) => void;
   onDelete: (track: Track) => void;
   getValidationError: (trackId: string, field: "trackCode" | "displayName") => string | null;
 }
@@ -41,6 +42,7 @@ function SortableTrackItem({
   onTrackCodeChange,
   onDisplayNameChange,
   onToggleEnabled,
+  onToggleOutbound,
   onDelete,
   getValidationError,
 }: SortableTrackItemProps) {
@@ -127,6 +129,28 @@ function SortableTrackItem({
               placeholder="North Storage, Tank Line, etc."
               className="w-full bg-zinc-900 text-white text-base px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
             />
+          </div>
+
+          {/* Outbound Mode Toggle */}
+          <div className="flex items-center justify-between bg-zinc-900/50 p-3 rounded-lg border border-zinc-700/50">
+            <div>
+              <label className="block text-zinc-300 text-sm font-medium">
+                Outbound Track
+              </label>
+              <p className="text-xs text-zinc-500 mt-1">
+                Cars here will prompt for offsite removal next day
+              </p>
+            </div>
+            <button
+              onClick={() => onToggleOutbound(track.id)}
+              className={`w-12 h-7 rounded-full transition-colors relative flex-shrink-0 ${
+                track.outboundMode === "manual-confirmation" ? "bg-blue-600" : "bg-zinc-700"
+              }`}
+            >
+              <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                track.outboundMode === "manual-confirmation" ? "translate-x-5" : ""
+              }`} />
+            </button>
           </div>
 
           {/* Delete Button */}
@@ -280,6 +304,18 @@ export default function ManageTracks() {
     setHasChanges(true);
   };
 
+  const handleToggleOutbound = (trackId: string) => {
+    setLocalTracks(prev => prev.map(track =>
+      track.id === trackId
+        ? { 
+            ...track, 
+            outboundMode: track.outboundMode === "manual-confirmation" ? "none" : "manual-confirmation" 
+          }
+        : track
+    ));
+    setHasChanges(true);
+  };
+
   const handleDeleteTrack = (track: Track) => {
     setDeleteDialogTrack(track);
   };
@@ -314,8 +350,11 @@ export default function ManageTracks() {
       id: `track-${Date.now()}`,
       name: normalizedCode,
       displayName: newDisplayName.trim() || undefined,
+      capacity: 50,
+      order: localTracks.length + 1,
       cars: [],
       enabled: true,
+      outboundMode: "none",
     };
 
     setLocalTracks(prev => [...prev, newTrack]);
@@ -391,6 +430,7 @@ export default function ManageTracks() {
                   onTrackCodeChange={handleTrackCodeChange}
                   onDisplayNameChange={handleDisplayNameChange}
                   onToggleEnabled={handleToggleEnabled}
+                  onToggleOutbound={handleToggleOutbound}
                   onDelete={handleDeleteTrack}
                   getValidationError={getValidationError}
                 />

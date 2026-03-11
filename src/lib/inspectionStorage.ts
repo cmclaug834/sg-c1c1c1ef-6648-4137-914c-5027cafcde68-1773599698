@@ -2,6 +2,7 @@ import { Inspection } from "@/types/inspection";
 
 const STORAGE_KEY = "gp_inspections_v1";
 const APPROVED_STORAGE_KEY = "gp_approved_inspections_v1";
+const COMPLETED_STORAGE_KEY = "gp_completed_inspections_v1";
 
 // Debounce helper for auto-save
 let saveTimeout: NodeJS.Timeout | null = null;
@@ -131,6 +132,50 @@ export const inspectionStorage = {
     const inspections = inspectionStorage.getInspections();
     const filtered = inspections.filter(i => i.id !== id);
     inspectionStorage.saveInspections(filtered);
+  },
+
+  // Completed inspections (archive database)
+  getCompletedInspections: (): Inspection[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const data = localStorage.getItem(COMPLETED_STORAGE_KEY);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch (error) {
+      console.error("[InspectionStorage] Failed to parse completed inspections:", error);
+      return [];
+    }
+  },
+
+  saveCompletedInspections: (inspections: Inspection[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(inspections));
+    } catch (error) {
+      console.error("[InspectionStorage] Failed to save completed inspections:", error);
+    }
+  },
+
+  archiveCompletedInspection: (id: string) => {
+    const inspections = inspectionStorage.getInspections();
+    const index = inspections.findIndex(i => i.id === id);
+    
+    if (index === -1) return;
+    
+    const inspection = inspections[index];
+    inspection.status = "complete";
+    inspection.currentStep = 4;
+    inspection.completedAt = new Date().toISOString();
+    inspection.updatedAt = new Date().toISOString();
+    
+    // Move to completed archive
+    const completed = inspectionStorage.getCompletedInspections();
+    completed.push(inspection);
+    inspectionStorage.saveCompletedInspections(completed);
+    
+    // Remove from active inspections
+    inspections.splice(index, 1);
+    inspectionStorage.saveInspections(inspections);
   },
 
   // Approved inspections (archive)

@@ -22,7 +22,6 @@ export default function InspectionPage1() {
   const [acceptReject, setAcceptReject] = useState<"yes" | "no" | undefined>(undefined);
   const [rejectReason, setRejectReason] = useState<string>("");
   const [showRejectSheet, setShowRejectSheet] = useState(false);
-  const [showExitDialog, setShowExitDialog] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -52,11 +51,7 @@ export default function InspectionPage1() {
   }
 
   const handleBack = () => {
-    // Step 1 - show exit confirmation
-    setShowExitDialog(true);
-  };
-
-  const handleConfirmExit = () => {
+    // Immediately save and exit to the inspections list
     router.push("/inspections");
   };
 
@@ -342,32 +337,6 @@ export default function InspectionPage1() {
           )}
         </div>
       </div>
-
-      {/* Exit Confirmation Dialog */}
-      {showExitDialog && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
-          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border-2 border-zinc-800 p-6">
-            <h3 className="text-xl font-bold mb-2">Exit Inspection?</h3>
-            <p className="text-zinc-400 mb-6">
-              Your progress is saved as a draft. You can resume later from the inspections list.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowExitDialog(false)}
-                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition-colors"
-              >
-                Stay
-              </button>
-              <button
-                onClick={handleConfirmExit}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
-              >
-                Exit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Signature Modal (Embedded) */}
       {showSignatureModal && (
