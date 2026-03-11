@@ -4,6 +4,16 @@ import { useState, useEffect } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection } from "@/types/inspection";
 import { useApp } from "@/contexts/AppContext";
+import {
+  X,
+  ChevronLeft,
+  Camera,
+  FileText,
+  Image as ImageIcon,
+  Video,
+  File,
+  Images,
+} from "lucide-react";
 
 const REJECT_REASONS = [
   "DOORS are unusable",
@@ -23,11 +33,35 @@ export default function InspectionPage1() {
   const [rejectReason, setRejectReason] = useState<string>("");
   const [showRejectSheet, setShowRejectSheet] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const mediaMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Close media menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mediaMenuRef.current &&
+        !mediaMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowMediaMenu(false);
+      }
+    };
+
+    if (showMediaMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMediaMenu]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -119,6 +153,74 @@ export default function InspectionPage1() {
   };
 
   const score = getCompletionScore();
+
+  const handleRejectReasonChange = (value: string) => {
+    setRejectReason(value);
+    updateInspectionDebounced(inspectionId, { rejectReason: value });
+  };
+
+  const handleAddPhotos = () => {
+    setShowMediaMenu(false);
+    // Trigger file input for photos
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "image/*";
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleTakeVideo = () => {
+    setShowMediaMenu(false);
+    // Trigger file input for video (up to 3 mins handled by browser or backend)
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "video/*";
+      fileInputRef.current.multiple = false;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleInsertFromGallery = () => {
+    setShowMediaMenu(false);
+    // Trigger file input for images from gallery
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "image/*";
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleAddPDF = () => {
+    setShowMediaMenu(false);
+    // Trigger file input for PDF files
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "application/pdf";
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    // TODO: Handle file upload
+    // For now, just log the files
+    console.log("Files selected:", Array.from(files));
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleAcceptRejectChange = (value: "accept" | "reject") => {
+    if (value === "accept") {
+      handleFieldUpdate("acceptReject", "yes");
+      handleFieldUpdate("rejectReason", "");
+    } else {
+      handleFieldUpdate("acceptReject", "no");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white pb-24">
@@ -212,13 +314,6 @@ export default function InspectionPage1() {
             </button>
             <button
               type="button"
-              onClick={handleMediaStub}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
-            >
-              Media
-            </button>
-            <button
-              type="button"
               onClick={() => handleActionStub("Action")}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
             >
@@ -231,23 +326,6 @@ export default function InspectionPage1() {
             >
               History
             </button>
-          </div>
-
-          {/* Required Photos Section */}
-          <div className="bg-zinc-800 rounded-lg p-4">
-            <p className="text-sm text-zinc-300 mb-3">
-              PICTURE(s) of 1) Exterior doorway with railcar number; 2) Interior each side from doorway
-            </p>
-            <button
-              type="button"
-              onClick={handleMediaStub}
-              className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors"
-            >
-              ADD MEDIA
-            </button>
-            <p className="text-xs text-zinc-500 mt-2 text-center">
-              Media capture coming soon
-            </p>
           </div>
 
           {/* Initial Signature Section */}

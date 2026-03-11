@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Camera, Video, Images, File } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
 import { Inspection } from "@/types/inspection";
@@ -14,11 +14,35 @@ export default function InspectionPage2() {
   const [isLoadBalanced, setIsLoadBalanced] = useState<"yes" | "no" | undefined>(undefined);
   const [loadNo, setLoadNo] = useState("");
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showMediaMenu, setShowMediaMenu] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const mediaMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Close media menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mediaMenuRef.current &&
+        !mediaMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowMediaMenu(false);
+      }
+    };
+
+    if (showMediaMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMediaMenu]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -74,6 +98,51 @@ export default function InspectionPage2() {
     inspectionStorage.archiveCompletedInspection(inspection.id);
 
     router.push("/inspections");
+  };
+
+  const handleAddPhotos = () => {
+    setShowMediaMenu(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "image/*";
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleTakeVideo = () => {
+    setShowMediaMenu(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "video/*";
+      fileInputRef.current.multiple = false;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleInsertFromGallery = () => {
+    setShowMediaMenu(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "image/*";
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleAddPDF = () => {
+    setShowMediaMenu(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "application/pdf";
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    console.log("Files selected:", Array.from(files));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const canComplete = 
@@ -180,19 +249,87 @@ export default function InspectionPage2() {
           </div>
 
           {/* Required Photos Section */}
-          <div className="bg-zinc-800 rounded-lg p-4">
+          <div className="bg-zinc-800 rounded-lg p-4 relative" ref={mediaMenuRef}>
             <p className="text-sm text-zinc-300 mb-3">
               PICTURE(s) of doorway before closing door with railcar number visible
             </p>
             <button
-              onClick={() => alert("Media coming soon")}
-              className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors"
+              type="button"
+              onClick={() => setShowMediaMenu(!showMediaMenu)}
+              className="w-full py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
             >
+              <Camera className="w-5 h-5" />
               ADD MEDIA
             </button>
-            <p className="text-xs text-zinc-500 mt-2 text-center">
-              Media capture coming soon
-            </p>
+
+            {/* Media Menu Dropdown */}
+            {showMediaMenu && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-800 rounded-lg shadow-xl border border-zinc-700 z-50 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={handleAddPhotos}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                    <Camera className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-white">Add Photos</div>
+                    <div className="text-xs text-zinc-400">Take or select photos</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTakeVideo}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
+                    <Video className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-white">Take Video</div>
+                    <div className="text-xs text-zinc-400">Record up to 3 minutes</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleInsertFromGallery}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-700 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                    <Images className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-white">Insert from Gallery</div>
+                    <div className="text-xs text-zinc-400">Choose existing photos</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAddPDF}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-700 transition-colors text-left border-t border-zinc-700"
+                >
+                  <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <File className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-white">Add PDF Files</div>
+                    <div className="text-xs text-zinc-400">Upload document files</div>
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
 
           {/* Load No Field */}
