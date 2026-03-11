@@ -198,44 +198,42 @@ export default function TrackReorder() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Bottom Controls */}
-      <div className="sticky bottom-0 bg-zinc-900 border-t border-zinc-800 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* G.resetBtn */}
-            <button
-              id="G.resetBtn"
-              onClick={handleReset}
-              className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-            >
-              Reset
-            </button>
+          {/* Action Buttons Card */}
+          <div className="mt-4 bg-zinc-800 rounded-xl p-4">
+            <div className="grid grid-cols-3 gap-3">
+              {/* G.resetBtn */}
+              <button
+                id="G.resetBtn"
+                onClick={handleReset}
+                className="py-3 bg-zinc-900 hover:bg-zinc-700 rounded-lg text-base font-medium transition-colors"
+              >
+                Reset
+              </button>
 
-            {/* G.cancelBtn */}
-            <button
-              id="G.cancelBtn"
-              onClick={handleCancel}
-              className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-            >
-              Cancel
-            </button>
+              {/* G.cancelBtn */}
+              <button
+                id="G.cancelBtn"
+                onClick={handleCancel}
+                className="py-3 bg-zinc-900 hover:bg-zinc-700 rounded-lg text-base font-medium transition-colors"
+              >
+                Cancel
+              </button>
 
-            {/* G.confirmBtn */}
-            <button
-              id="G.confirmBtn"
-              onClick={handleConfirm}
-              disabled={rightCars.length === 0}
-              className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
-                rightCars.length > 0
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-              }`}
-            >
-              Confirm order
-            </button>
+              {/* G.confirmBtn */}
+              <button
+                id="G.confirmBtn"
+                onClick={handleConfirm}
+                disabled={rightCars.length === 0}
+                className={`py-3 rounded-lg text-base font-medium transition-colors ${
+                  rightCars.length > 0
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                }`}
+              >
+                Confirm
+              </button>
+            </div>
           </div>
         </div>
       </div>
