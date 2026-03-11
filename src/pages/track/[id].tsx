@@ -362,9 +362,14 @@ export default function TrackDetail() {
     
     // Create new inspection with car pre-filled
     const newInspection = inspectionStorage.createInspection({
-      inspectorName: currentUser.name,
-      vehicleId: car.carNumber,
+      templateId: "default",
+      status: "in_progress",
+      carNumber: normalizeCarId(car.carNumber),
       currentStep: 1,
+      media: {
+        doorwayExteriorAndInterior: [],
+        doorwayBeforeClosing: [],
+      }
     });
 
     // Navigate to inspection form
