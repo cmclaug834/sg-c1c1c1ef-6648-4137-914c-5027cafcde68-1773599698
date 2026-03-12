@@ -1,4 +1,6 @@
 import { Inspection } from "@/types/inspection";
+import { saveCompressedInspection } from "./inspectionExport";
+import { emailConfigStorage, fillEmailTemplate, sendInspectionEmail } from "./emailConfig";
 
 const STORAGE_KEY = "gp_inspections_v1";
 const APPROVED_STORAGE_KEY = "gp_approved_inspections_v1";
@@ -167,6 +169,30 @@ export const inspectionStorage = {
     inspection.currentStep = 4;
     inspection.completedAt = new Date().toISOString();
     inspection.updatedAt = new Date().toISOString();
+    
+    // Save compressed copy for internal storage
+    saveCompressedInspection(inspection);
+    
+    // Auto-send email if configured
+    const emailConfig = emailConfigStorage.getConfig();
+    if (emailConfig.enabled && emailConfig.autoSendOnComplete && emailConfig.recipients.length > 0) {
+      const subject = fillEmailTemplate(emailConfig.subject, inspection);
+      const body = fillEmailTemplate(emailConfig.bodyTemplate, inspection);
+      
+      sendInspectionEmail(inspection, emailConfig.recipients, subject, body)
+        .then(success => {
+          if (success) {
+            console.log(`[InspectionStorage] Email sent for inspection ${id}`);
+            emailConfigStorage.saveConfig({
+              ...emailConfig,
+              lastSentAt: new Date().toISOString(),
+            });
+          }
+        })
+        .catch(error => {
+          console.error("[InspectionStorage] Failed to send email:", error);
+        });
+    }
     
     // Move to completed archive
     const completed = inspectionStorage.getCompletedInspections();
