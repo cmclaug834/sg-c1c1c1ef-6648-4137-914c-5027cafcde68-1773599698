@@ -4,7 +4,7 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
-import { getTracks, saveTracks } from "@/lib/storage";
+import { storage } from "@/lib/storage";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = getCurrentUser();
@@ -23,7 +23,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     switch (req.method) {
       case "GET":
         // Get single track
-        const tracks = getTracks();
+        const tracks = storage.getTracks();
         const track = tracks.find((t) => t.id === id);
         
         if (!track) {
@@ -38,7 +38,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(403).json({ error: "Permission denied" });
         }
         
-        const allTracks = getTracks();
+        const allTracks = storage.getTracks();
         const index = allTracks.findIndex((t) => t.id === id);
         
         if (index === -1) {
@@ -46,7 +46,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
         
         allTracks[index] = { ...allTracks[index], ...req.body };
-        saveTracks(allTracks);
+        storage.saveTracks(allTracks);
         
         return res.status(200).json({ track: allTracks[index] });
       
@@ -56,8 +56,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(403).json({ error: "Permission denied" });
         }
         
-        const tracksAfterDelete = getTracks().filter((t) => t.id !== id);
-        saveTracks(tracksAfterDelete);
+        const tracksAfterDelete = storage.getTracks().filter((t) => t.id !== id);
+        storage.saveTracks(tracksAfterDelete);
         
         return res.status(200).json({ success: true });
       

@@ -21,7 +21,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           return res.status(403).json({ error: "Permission denied" });
         }
         
-        const inspections = inspectionStorage.getAllInspections();
+        const inspections = inspectionStorage.getInspections();
         return res.status(200).json({ inspections });
       
       case "POST":
@@ -31,8 +31,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
         
         const newInspection = req.body;
-        inspectionStorage.saveInspection(newInspection);
-        return res.status(201).json({ inspection: newInspection });
+        const created = inspectionStorage.createInspection(newInspection);
+        return res.status(201).json({ inspection: created });
       
       default:
         return res.status(405).json({ error: "Method not allowed" });

@@ -4,7 +4,7 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
-import { getTracks, saveTracks } from "@/lib/storage";
+import { storage } from "@/lib/storage";
 import { Track } from "@/types";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -18,7 +18,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     switch (req.method) {
       case "GET":
         // Get all tracks
-        const tracks = getTracks();
+        const tracks = storage.getTracks();
         return res.status(200).json({ tracks });
       
       case "POST":
@@ -28,9 +28,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
         
         const newTrack = req.body as Track;
-        const currentTracks = getTracks();
+        const currentTracks = storage.getTracks();
         currentTracks.push(newTrack);
-        saveTracks(currentTracks);
+        storage.saveTracks(currentTracks);
         
         return res.status(201).json({ track: newTrack });
       
@@ -41,7 +41,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
         
         const updatedTracks = req.body as Track[];
-        saveTracks(updatedTracks);
+        storage.saveTracks(updatedTracks);
         
         return res.status(200).json({ tracks: updatedTracks });
       
