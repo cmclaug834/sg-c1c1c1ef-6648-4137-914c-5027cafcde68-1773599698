@@ -1,0 +1,288 @@
+/**
+ * Authentication and User Management
+ */
+
+import { User, AuthSession, LoginCredentials, UserRole, UserPermissions, ROLE_PERMISSIONS } from "@/types/auth";
+
+const USERS_STORAGE_KEY = "railyard_users";
+const SESSIONS_STORAGE_KEY = "railyard_sessions";
+const CURRENT_SESSION_KEY = "railyard_current_session";
+
+// Default admin user (created on first use)
+const DEFAULT_ADMIN: User = {
+  id: "admin-default",
+  username: "admin",
+  displayName: "Administrator",
+  role: "admin",
+  email: "admin@railyard.local",
+  createdAt: new Date().toISOString(),
+  isActive: true,
+};
+
+// Password storage (in production, use proper hashing)
+const PASSWORDS_KEY = "railyard_passwords";
+
+interface PasswordEntry {
+  userId: string;
+  hash: string; // In production: bcrypt hash
+}
+
+/**
+ * Simple hash function (REPLACE WITH BCRYPT IN PRODUCTION)
+ */
+function simpleHash(password: string): string {
+  // This is NOT secure - just for demonstration
+  // In production, use: bcrypt.hash(password, 10)
+  return btoa(password + "salt_railyard_2026");
+}
+
+function verifyPassword(password: string, hash: string): boolean {
+  return simpleHash(password) === hash;
+}
+
+/**
+ * Initialize default admin user
+ */
+export function initializeAuth(): void {
+  const users = getUsers();
+  if (users.length === 0) {
+    // Create default admin
+    saveUser(DEFAULT_ADMIN, "admin123"); // Default password
+    console.log("[Auth] Default admin user created (username: admin, password: admin123)");
+  }
+}
+
+/**
+ * Get all users
+ */
+export function getUsers(): User[] {
+  if (typeof window === "undefined") return [];
+  const data = localStorage.getItem(USERS_STORAGE_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+/**
+ * Save user
+ */
+function saveUsers(users: User[]): void {
+  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+}
+
+/**
+ * Create or update user
+ */
+export function saveUser(user: User, password?: string): void {
+  const users = getUsers();
+  const index = users.findIndex((u) => u.id === user.id);
+  
+  if (index >= 0) {
+    users[index] = user;
+  } else {
+    users.push(user);
+  }
+  
+  saveUsers(users);
+  
+  // Save password if provided
+  if (password) {
+    const passwords: PasswordEntry[] = JSON.parse(localStorage.getItem(PASSWORDS_KEY) || "[]");
+    const passIndex = passwords.findIndex((p) => p.userId === user.id);
+    const hash = simpleHash(password);
+    
+    if (passIndex >= 0) {
+      passwords[passIndex].hash = hash;
+    } else {
+      passwords.push({ userId: user.id, hash });
+    }
+    
+    localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
+  }
+}
+
+/**
+ * Delete user
+ */
+export function deleteUser(userId: string): void {
+  const users = getUsers().filter((u) => u.id !== userId);
+  saveUsers(users);
+  
+  // Delete password
+  const passwords: PasswordEntry[] = JSON.parse(localStorage.getItem(PASSWORDS_KEY) || "[]");
+  const filtered = passwords.filter((p) => p.userId !== userId);
+  localStorage.setItem(PASSWORDS_KEY, JSON.stringify(filtered));
+  
+  // Delete sessions
+  const sessions = getSessions().filter((s) => s.userId !== userId);
+  saveSessions(sessions);
+}
+
+/**
+ * Get user by ID
+ */
+export function getUserById(userId: string): User | null {
+  const users = getUsers();
+  return users.find((u) => u.id === userId) || null;
+}
+
+/**
+ * Get user by username
+ */
+export function getUserByUsername(username: string): User | null {
+  const users = getUsers();
+  return users.find((u) => u.username === username) || null;
+}
+
+/**
+ * Login user
+ */
+export function login(credentials: LoginCredentials): AuthSession | null {
+  const user = getUserByUsername(credentials.username);
+  if (!user || !user.isActive) return null;
+  
+  // Verify password
+  const passwords: PasswordEntry[] = JSON.parse(localStorage.getItem(PASSWORDS_KEY) || "[]");
+  const passwordEntry = passwords.find((p) => p.userId === user.id);
+  
+  if (!passwordEntry || !verifyPassword(credentials.password, passwordEntry.hash)) {
+    return null;
+  }
+  
+  // Create session
+  const session: AuthSession = {
+    userId: user.id,
+    token: generateToken(),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+    deviceId: generateDeviceId(),
+    deviceName: credentials.deviceName,
+  };
+  
+  // Save session
+  const sessions = getSessions();
+  sessions.push(session);
+  saveSessions(sessions);
+  
+  // Set current session
+  localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(session));
+  
+  // Update last login
+  user.lastLogin = new Date().toISOString();
+  saveUser(user);
+  
+  return session;
+}
+
+/**
+ * Logout
+ */
+export function logout(): void {
+  const session = getCurrentSession();
+  if (session) {
+    // Remove session
+    const sessions = getSessions().filter((s) => s.token !== session.token);
+    saveSessions(sessions);
+  }
+  
+  localStorage.removeItem(CURRENT_SESSION_KEY);
+}
+
+/**
+ * Get current session
+ */
+export function getCurrentSession(): AuthSession | null {
+  if (typeof window === "undefined") return null;
+  const data = localStorage.getItem(CURRENT_SESSION_KEY);
+  if (!data) return null;
+  
+  const session: AuthSession = JSON.parse(data);
+  
+  // Check if expired
+  if (new Date(session.expiresAt) < new Date()) {
+    logout();
+    return null;
+  }
+  
+  return session;
+}
+
+/**
+ * Get current user
+ */
+export function getCurrentUser(): User | null {
+  const session = getCurrentSession();
+  if (!session) return null;
+  return getUserById(session.userId);
+}
+
+/**
+ * Get all sessions
+ */
+function getSessions(): AuthSession[] {
+  if (typeof window === "undefined") return [];
+  const data = localStorage.getItem(SESSIONS_STORAGE_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+/**
+ * Save sessions
+ */
+function saveSessions(sessions: AuthSession[]): void {
+  localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+}
+
+/**
+ * Get user permissions
+ */
+export function getUserPermissions(user: User | null): UserPermissions {
+  if (!user) {
+    return {
+      canCreateInspections: false,
+      canEditInspections: false,
+      canDeleteInspections: false,
+      canViewAllInspections: false,
+      canManageUsers: false,
+      canManageTracks: false,
+      canExportData: false,
+      canAccessAdmin: false,
+      canConfigureSystem: false,
+    };
+  }
+  
+  return ROLE_PERMISSIONS[user.role];
+}
+
+/**
+ * Check permission
+ */
+export function hasPermission(user: User | null, permission: keyof UserPermissions): boolean {
+  const permissions = getUserPermissions(user);
+  return permissions[permission];
+}
+
+/**
+ * Generate token
+ */
+function generateToken(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Generate device ID
+ */
+function generateDeviceId(): string {
+  let deviceId = localStorage.getItem("railyard_device_id");
+  if (!deviceId) {
+    deviceId = `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("railyard_device_id", deviceId);
+  }
+  return deviceId;
+}
+
+/**
+ * Clean up expired sessions
+ */
+export function cleanupExpiredSessions(): void {
+  const sessions = getSessions();
+  const now = new Date();
+  const active = sessions.filter((s) => new Date(s.expiresAt) > now);
+  saveSessions(active);
+}

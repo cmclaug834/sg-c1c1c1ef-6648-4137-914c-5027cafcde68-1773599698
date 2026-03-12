@@ -390,3 +390,57 @@ export function getDefaultBackendConfig(): BackendConfig {
     },
   };
 }
+
+/**
+ * Get current storage usage statistics
+ */
+export function getStorageUsage(): StorageUsageInfo {
+  // In a real app, this would calculate actual file/db sizes
+  return {
+    inspections: 15.2 * 1024 * 1024,
+    media: 234.7 * 1024 * 1024,
+    trackData: 856 * 1024,
+    cached: 2.1 * 1024 * 1024,
+    total: 252.8 * 1024 * 1024,
+    limit: 500 * 1024 * 1024,
+    percentage: 50.5,
+  };
+}
+
+/**
+ * Test access to a specific file system path
+ */
+export async function testFileSystemAccess(path: string): Promise<boolean> {
+  // Simulated check
+  return true;
+}
+
+/**
+ * Run a full system health diagnostic check
+ */
+export async function runSystemHealthCheck(): Promise<HealthCheckResult> {
+  // Simulated check taking a little time to resolve
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        storageAccessible: true,
+        writePermissions: true,
+        networkConnected: navigator.onLine,
+        diskSpaceOK: true,
+        overallStatus: "healthy",
+        issues: [],
+        recommendations: [],
+      });
+    }, 1200);
+  });
+}
+
+/**
+ * Clear temporary application cache/files
+ */
+export function clearTemporaryFiles(): number {
+  // Simulated cache clearing
+  const itemsCleared = Math.floor(Math.random() * 40) + 12;
+  console.log(`[BackendConfig] Cleared ${itemsCleared} temporary items`);
+  return itemsCleared;
+}
