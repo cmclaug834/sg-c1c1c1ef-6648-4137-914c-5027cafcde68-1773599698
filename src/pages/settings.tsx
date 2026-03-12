@@ -1,6 +1,6 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
 import type { DebugLogEntry } from "@/lib/diagnostics";

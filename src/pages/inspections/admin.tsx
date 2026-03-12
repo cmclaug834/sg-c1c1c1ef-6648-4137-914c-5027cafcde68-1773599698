@@ -1,659 +1,530 @@
-import { useRouter } from "next/router";
-import { ArrowLeft, Trash2, AlertTriangle, ChevronUp, ChevronDown, Plus, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { 
+  ArrowLeft, 
+  Search, 
+  Filter, 
+  Download, 
+  Mail, 
+  FileText, 
+  Settings,
+  Trash2,
+  CheckCircle,
+  Clock,
+  Archive,
+  RefreshCw,
+  HardDrive
+} from "lucide-react";
 import { inspectionStorage } from "@/lib/inspectionStorage";
-import { inspectionConfigStorage } from "@/lib/inspectionConfig";
-import { storage, ReferenceData } from "@/lib/storage";
-import { Inspection, InspectionFormConfig } from "@/types/inspection";
-import { useApp } from "@/contexts/AppContext";
+import { 
+  exportAsJSON, 
+  exportAsPDF, 
+  getCompressedInspections,
+  sendInspectionEmail
+} from "@/lib/inspectionExport";
+import { emailConfigStorage, EmailConfig } from "@/lib/emailConfig";
+import { Inspection } from "@/types/inspection";
 
-export default function InspectionAdmin() {
+export default function AdminPage() {
   const router = useRouter();
-  const { currentUser } = useApp();
+  const [activeTab, setActiveTab] = useState<"all" | "drafts" | "completed" | "storage" | "email">("all");
   
-  const [mounted, setMounted] = useState(false);
-  const [drafts, setDrafts] = useState<Inspection[]>([]);
-  const [config, setConfig] = useState<InspectionFormConfig | null>(null);
-  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
-  const [showClearAllDialog, setShowClearAllDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<"drafts" | "config" | "reference">("drafts");
+  // Data states
+  const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [compressedStorage, setCompressedStorage] = useState<any[]>([]);
+  const [emailConfig, setEmailConfig] = useState<EmailConfig | null>(null);
   
-  // Reference data editing state
-  const [newSite, setNewSite] = useState("");
-  const [newHouseCode, setNewHouseCode] = useState("");
-  const [siteError, setSiteError] = useState("");
-  const [houseError, setHouseError] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "site" | "house"; value: string } | null>(null);
+  // Filter/search states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Email config states
+  const [newEmail, setNewEmail] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-    if (currentUser === null) {
-      router.push("/");
-      return;
-    }
-    
-    loadData();
-  }, [mounted, currentUser, router]);
-
   const loadData = () => {
-    const inspections = inspectionStorage.getInspections();
-    const inProgress = inspections.filter(
-      i => i.status === "draft" || i.status === "in_progress"
-    );
-    setDrafts(inProgress);
-    setConfig(inspectionConfigStorage.getConfig());
-    setReferenceData(storage.getReferenceData());
-  };
-
-  if (!mounted || !currentUser || !config || !referenceData) {
-    return null;
-  }
-
-  const handleDeleteDraft = (id: string) => {
-    inspectionStorage.deleteInspection(id);
-    loadData();
-    setShowDeleteDialog(null);
-  };
-
-  const handleClearAll = () => {
-    drafts.forEach(draft => {
-      inspectionStorage.deleteInspection(draft.id);
-    });
-    loadData();
-    setShowClearAllDialog(false);
-  };
-
-  const handleToggleSection = (sectionId: string) => {
-    const updatedConfig = {
-      ...config,
-      sections: config.sections.map(s =>
-        s.id === sectionId ? { ...s, enabled: !s.enabled } : s
-      ),
-    };
-    setConfig(updatedConfig);
-  };
-
-  const handleToggleRequired = (sectionId: string) => {
-    const updatedConfig = {
-      ...config,
-      sections: config.sections.map(s =>
-        s.id === sectionId ? { ...s, required: !s.required } : s
-      ),
-    };
-    setConfig(updatedConfig);
-  };
-
-  const handleMoveSection = (sectionId: string, direction: "up" | "down") => {
-    const sortedSections = [...config.sections].sort((a, b) => a.order - b.order);
-    const index = sortedSections.findIndex(s => s.id === sectionId);
-    
-    if (index === -1) return;
-    if (direction === "up" && index === 0) return;
-    if (direction === "down" && index === sortedSections.length - 1) return;
-    
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    
-    const temp = sortedSections[index].order;
-    sortedSections[index].order = sortedSections[newIndex].order;
-    sortedSections[newIndex].order = temp;
-    
-    setConfig({
-      ...config,
-      sections: sortedSections,
-    });
-  };
-
-  const handleSaveConfig = () => {
-    if (!config) return;
-    inspectionConfigStorage.saveConfig(config);
-    alert("Form configuration saved");
-  };
-
-  const handleResetConfig = () => {
-    if (!confirm("Reset form configuration to defaults?")) return;
-    const defaultConfig = inspectionConfigStorage.resetToDefault();
-    setConfig(defaultConfig);
-    alert("Form configuration reset to defaults");
-  };
-
-  // Reference data handlers
-  const validateSite = (value: string): string | null => {
-    const trimmed = value.trim().toUpperCase();
-    
-    if (!trimmed) {
-      return "Site code cannot be empty";
+    setIsRefreshing(true);
+    try {
+      // Load all inspections
+      const active = inspectionStorage.getInspections();
+      const completed = inspectionStorage.getCompletedInspections();
+      const approved = inspectionStorage.getApprovedInspections();
+      
+      // Combine all types for admin view
+      const all = [...active, ...completed, ...approved].sort((a, b) => 
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+      
+      setInspections(all);
+      
+      // Load compressed storage stats
+      setCompressedStorage(getCompressedInspections());
+      
+      // Load email config
+      setEmailConfig(emailConfigStorage.getConfig());
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
     }
-    
-    if (!/^[A-Z0-9\s-]+$/.test(trimmed)) {
-      return "Site code can only contain letters, numbers, spaces, and hyphens";
-    }
-    
-    if (referenceData.sites.some(s => s.toUpperCase() === trimmed)) {
-      return "Site code already exists";
-    }
-    
-    return null;
   };
 
-  const validateHouseCode = (value: string): string | null => {
-    const trimmed = value.trim().toUpperCase();
+  // --- Actions ---
+
+  const handleDelete = (id: string, isCompleted: boolean) => {
+    if (!confirm("Are you sure you want to delete this inspection permanently?")) return;
     
-    if (!trimmed) {
-      return "House code cannot be empty";
+    if (isCompleted) {
+      // Would need to add delete method to storage for completed/approved
+      alert("Deleting completed inspections requires super-admin access.");
+    } else {
+      inspectionStorage.deleteInspection(id);
+      loadData();
     }
-    
-    if (!/^[A-Z0-9\s-]+$/.test(trimmed)) {
-      return "House code can only contain letters, numbers, spaces, and hyphens";
-    }
-    
-    if (referenceData.houseCodes.some(h => h.toUpperCase() === trimmed)) {
-      return "House code already exists";
-    }
-    
-    return null;
   };
 
-  const handleAddSite = () => {
-    const error = validateSite(newSite);
-    if (error) {
-      setSiteError(error);
+  const handleManualEmail = async (inspection: Inspection) => {
+    if (!emailConfig || emailConfig.recipients.length === 0) {
+      alert("Please configure email recipients in the Email Settings tab first.");
+      setActiveTab("email");
       return;
     }
-    
-    const trimmed = newSite.trim().toUpperCase();
-    const updated: ReferenceData = {
-      ...referenceData,
-      sites: [...referenceData.sites, trimmed].sort(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    storage.saveReferenceData(updated);
-    setReferenceData(updated);
-    setNewSite("");
-    setSiteError("");
+
+    setIsSending(true);
+    try {
+      // In a real app, you would pass the subject/body templates filled with data
+      const subject = `Inspection Report: ${inspection.carNumber || 'Unknown'}`;
+      const body = `Manual send of inspection report for ${inspection.carNumber}.`;
+      
+      await sendInspectionEmail(inspection, emailConfig.recipients, subject, body);
+      alert("Email sent successfully!");
+    } catch (error) {
+      alert("Failed to send email. Check console for details.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleAddHouseCode = () => {
-    const error = validateHouseCode(newHouseCode);
-    if (error) {
-      setHouseError(error);
-      return;
+  // --- Email Config Actions ---
+
+  const handleSaveEmailConfig = (updates: Partial<EmailConfig>) => {
+    if (!emailConfig) return;
+    const newConfig = { ...emailConfig, ...updates };
+    setEmailConfig(newConfig);
+    emailConfigStorage.saveConfig(newConfig);
+  };
+
+  const handleAddRecipient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail || !newEmail.includes("@")) return;
+    
+    emailConfigStorage.addRecipient(newEmail);
+    setEmailConfig(emailConfigStorage.getConfig());
+    setNewEmail("");
+  };
+
+  const handleRemoveRecipient = (email: string) => {
+    emailConfigStorage.removeRecipient(email);
+    setEmailConfig(emailConfigStorage.getConfig());
+  };
+
+  // --- Derived Data ---
+
+  const filteredInspections = inspections.filter(i => {
+    // Filter by tab
+    if (activeTab === "drafts" && i.status === "complete") return false;
+    if (activeTab === "completed" && i.status !== "complete") return false;
+    
+    // Filter by search
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      return (
+        i.carNumber?.toLowerCase().includes(term) ||
+        i.id.toLowerCase().includes(term) ||
+        i.site?.toLowerCase().includes(term)
+      );
     }
     
-    const trimmed = newHouseCode.trim().toUpperCase();
-    const updated: ReferenceData = {
-      ...referenceData,
-      houseCodes: [...referenceData.houseCodes, trimmed].sort(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    storage.saveReferenceData(updated);
-    setReferenceData(updated);
-    setNewHouseCode("");
-    setHouseError("");
-  };
+    return true;
+  });
 
-  const handleDeleteSite = (site: string) => {
-    const updated: ReferenceData = {
-      ...referenceData,
-      sites: referenceData.sites.filter(s => s !== site),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    storage.saveReferenceData(updated);
-    setReferenceData(updated);
-    setDeleteConfirm(null);
-  };
-
-  const handleDeleteHouseCode = (houseCode: string) => {
-    const updated: ReferenceData = {
-      ...referenceData,
-      houseCodes: referenceData.houseCodes.filter(h => h !== houseCode),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    storage.saveReferenceData(updated);
-    setReferenceData(updated);
-    setDeleteConfirm(null);
-  };
-
-  const formatTimestamp = (isoString: string) => {
-    const date = new Date(isoString);
-    return date.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+  const totalStorageSize = compressedStorage.reduce((acc, curr) => acc + curr.size, 0);
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white pb-20">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => router.back()}
-            className="p-2 -ml-2 hover:bg-zinc-800 rounded-lg transition-colors"
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+      {/* Header */}
+      <header className="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => router.push('/settings')}
+              className="p-2 -ml-2 rounded-full hover:bg-zinc-800 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-bold text-white">Inspection Admin</h1>
+          </div>
+          
+          <button 
+            onClick={loadData}
+            disabled={isRefreshing}
+            className={`p-2 rounded-full hover:bg-zinc-800 transition-colors ${isRefreshing ? 'opacity-50' : ''}`}
           >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-2xl font-bold">Inspection Admin</h1>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab("drafts")}
-            className={`flex-1 py-3 px-4 rounded-lg text-base font-medium transition-colors ${
-              activeTab === "drafts"
-                ? "bg-green-600 text-white"
-                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-            }`}
-          >
-            Drafts ({drafts.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("config")}
-            className={`flex-1 py-3 px-4 rounded-lg text-base font-medium transition-colors ${
-              activeTab === "config"
-                ? "bg-green-600 text-white"
-                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-            }`}
-          >
-            Form Config
-          </button>
-          <button
-            onClick={() => setActiveTab("reference")}
-            className={`flex-1 py-3 px-4 rounded-lg text-base font-medium transition-colors ${
-              activeTab === "reference"
-                ? "bg-green-600 text-white"
-                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-            }`}
-          >
-            Reference Lists
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
+      </header>
 
-        {/* Content */}
-        {activeTab === "drafts" ? (
-          <div className="space-y-6">
-            {drafts.length > 0 && (
-              <button
-                onClick={() => setShowClearAllDialog(true)}
-                className="w-full py-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2"
+      {/* Main Content */}
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 flex flex-col md:flex-row gap-6">
+        
+        {/* Sidebar Navigation */}
+        <aside className="md:w-64 flex-shrink-0">
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden sticky top-24">
+            <nav className="flex flex-col">
+              <button 
+                onClick={() => setActiveTab("all")}
+                className={`flex items-center gap-3 p-4 text-left transition-colors ${activeTab === "all" ? "bg-blue-600/20 text-blue-400 border-l-2 border-blue-500" : "hover:bg-zinc-800 border-l-2 border-transparent"}`}
               >
-                <Trash2 className="w-5 h-5" />
-                Clear ALL Drafts ({drafts.length})
+                <FileText className="w-5 h-5" />
+                <span className="font-medium">All Inspections</span>
               </button>
-            )}
+              
+              <button 
+                onClick={() => setActiveTab("drafts")}
+                className={`flex items-center gap-3 p-4 text-left transition-colors ${activeTab === "drafts" ? "bg-orange-600/20 text-orange-400 border-l-2 border-orange-500" : "hover:bg-zinc-800 border-l-2 border-transparent"}`}
+              >
+                <Clock className="w-5 h-5" />
+                <span className="font-medium">Active Drafts</span>
+                <span className="ml-auto bg-zinc-800 text-xs px-2 py-1 rounded-full">
+                  {inspections.filter(i => i.status !== "complete").length}
+                </span>
+              </button>
+              
+              <button 
+                onClick={() => setActiveTab("completed")}
+                className={`flex items-center gap-3 p-4 text-left transition-colors ${activeTab === "completed" ? "bg-green-600/20 text-green-400 border-l-2 border-green-500" : "hover:bg-zinc-800 border-l-2 border-transparent"}`}
+              >
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-medium">Completed</span>
+                <span className="ml-auto bg-zinc-800 text-xs px-2 py-1 rounded-full">
+                  {inspections.filter(i => i.status === "complete").length}
+                </span>
+              </button>
+              
+              <div className="h-px bg-zinc-800 my-2"></div>
+              
+              <button 
+                onClick={() => setActiveTab("email")}
+                className={`flex items-center gap-3 p-4 text-left transition-colors ${activeTab === "email" ? "bg-purple-600/20 text-purple-400 border-l-2 border-purple-500" : "hover:bg-zinc-800 border-l-2 border-transparent"}`}
+              >
+                <Settings className="w-5 h-5" />
+                <span className="font-medium">Auto-Email Config</span>
+              </button>
 
-            {drafts.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-xl text-zinc-400">No drafts or in-progress forms</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {drafts.map(draft => {
-                  const houseCode = draft.houseCode || draft.houseNumber || "—";
-                  const carNumber = draft.carNumber || draft.vehicleId || "—";
-                  const startedAt = draft.startedAt || draft.createdAt;
-
-                  return (
-                    <div
-                      key={draft.id}
-                      className="bg-zinc-800 p-4 rounded-xl"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="text-lg font-bold mb-1 font-mono">
-                            {houseCode} / {carNumber}
-                          </div>
-                          <div className="text-sm text-zinc-400">
-                            Started: {formatTimestamp(startedAt)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setShowDeleteDialog(draft.id)}
-                          className="p-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              <button 
+                onClick={() => setActiveTab("storage")}
+                className={`flex items-center gap-3 p-4 text-left transition-colors ${activeTab === "storage" ? "bg-blue-600/20 text-blue-400 border-l-2 border-blue-500" : "hover:bg-zinc-800 border-l-2 border-transparent"}`}
+              >
+                <HardDrive className="w-5 h-5" />
+                <span className="font-medium">Internal Storage</span>
+              </button>
+            </nav>
           </div>
-        ) : activeTab === "config" ? (
-          <div className="space-y-6">
-            <div className="bg-zinc-800 p-5 rounded-xl">
-              <h2 className="text-lg font-bold mb-4">Form Sections</h2>
-              <p className="text-sm text-zinc-400 mb-4">
-                Enable/disable sections and mark as required. Disabled sections won't appear in the form.
-              </p>
+        </aside>
 
-              <div className="space-y-2">
-                {config.sections
-                  .sort((a, b) => a.order - b.order)
-                  .map((section, index) => (
-                    <div
-                      key={section.id}
-                      className="bg-zinc-900 p-4 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col gap-1">
-                          <button
-                            onClick={() => handleMoveSection(section.id, "up")}
-                            disabled={index === 0}
-                            className={`p-1 rounded transition-colors ${
-                              index === 0
-                                ? "text-zinc-700 cursor-not-allowed"
-                                : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                            }`}
-                          >
-                            <ChevronUp className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleMoveSection(section.id, "down")}
-                            disabled={index === config.sections.length - 1}
-                            className={`p-1 rounded transition-colors ${
-                              index === config.sections.length - 1
-                                ? "text-zinc-700 cursor-not-allowed"
-                                : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                            }`}
-                          >
-                            <ChevronDown className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="text-base font-medium">
-                            {section.label}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <button
-                            onClick={() => handleToggleRequired(section.id)}
-                            disabled={!section.enabled}
-                            className={`text-xs px-3 py-1 rounded transition-colors ${
-                              !section.enabled
-                                ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                                : section.required
-                                ? "bg-red-600/20 text-red-400 border border-red-600/50"
-                                : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                            }`}
-                          >
-                            {section.required ? "Required" : "Optional"}
-                          </button>
-
-                          <button
-                            onClick={() => handleToggleSection(section.id)}
-                            className={`w-12 h-7 rounded-full transition-colors relative ${
-                              section.enabled ? "bg-green-600" : "bg-zinc-700"
-                            }`}
-                          >
-                            <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
-                              section.enabled ? "translate-x-5" : ""
-                            }`} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleResetConfig}
-                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-base font-medium transition-colors"
-              >
-                Reset to Defaults
-              </button>
-              <button
-                onClick={handleSaveConfig}
-                className="flex-1 py-4 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
-              >
-                Save Config
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Site IDs Card */}
-            <div className="bg-zinc-800 p-5 rounded-xl">
-              <h2 className="text-lg font-bold mb-4">Site IDs</h2>
-              <p className="text-sm text-zinc-400 mb-4">
-                Manage the list of site codes available in inspection forms
-              </p>
-
-              {/* Add Site Input */}
-              <div className="mb-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newSite}
-                    onChange={(e) => {
-                      setNewSite(e.target.value);
-                      setSiteError("");
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddSite();
-                      }
-                    }}
-                    placeholder="Enter site code..."
-                    className="flex-1 bg-zinc-900 text-white px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleAddSite}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add Site
-                  </button>
-                </div>
-                {siteError && (
-                  <p className="text-red-400 text-sm mt-2">{siteError}</p>
-                )}
+        {/* Content Area */}
+        <div className="flex-1 min-w-0">
+          
+          {/* TAB: Inspections List (All/Drafts/Completed) */}
+          {(activeTab === "all" || activeTab === "drafts" || activeTab === "completed") && (
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Search by car number, site, or ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                />
               </div>
 
-              {/* Site List */}
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {referenceData.sites.length === 0 ? (
-                  <p className="text-center text-zinc-500 py-4">No sites configured</p>
+              {/* List */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                {filteredInspections.length === 0 ? (
+                  <div className="p-8 text-center text-zinc-500">
+                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <p>No inspections found</p>
+                  </div>
                 ) : (
-                  referenceData.sites.map(site => (
-                    <div
-                      key={site}
-                      className="bg-zinc-900 p-3 rounded-lg flex items-center justify-between"
-                    >
-                      <span className="font-mono text-lg">{site}</span>
-                      <button
-                        onClick={() => setDeleteConfirm({ type: "site", value: site })}
-                        className="p-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))
+                  <div className="divide-y divide-zinc-800">
+                    {filteredInspections.map((inspection) => (
+                      <div key={inspection.id} className="p-4 hover:bg-zinc-800/50 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="font-bold text-white text-lg truncate">
+                                {inspection.carNumber || "Unassigned Car"}
+                              </h3>
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                inspection.status === "complete" 
+                                  ? "bg-green-500/20 text-green-400" 
+                                  : "bg-orange-500/20 text-orange-400"
+                              }`}>
+                                {inspection.status.toUpperCase()}
+                              </span>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-400">
+                              <span>ID: {inspection.id.split('-')[1]}</span>
+                              <span>•</span>
+                              <span>Site: {inspection.site || "N/A"}</span>
+                              <span>•</span>
+                              <span>Updated: {new Date(inspection.updatedAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2">
+                            {/* Edit (Drafts only) */}
+                            {inspection.status !== "complete" && (
+                              <button 
+                                onClick={() => router.push(`/inspection/${inspection.id}/page/${inspection.currentStep || 1}`)}
+                                className="px-3 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg text-sm font-medium transition-colors"
+                              >
+                                Resume
+                              </button>
+                            )}
+                            
+                            {/* Review (Completed) */}
+                            {inspection.status === "complete" && (
+                              <button 
+                                onClick={() => router.push('/inspections/review')}
+                                className="px-3 py-1.5 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
+                              >
+                                View
+                              </button>
+                            )}
+
+                            {/* Export PDF */}
+                            <button 
+                              onClick={() => exportAsPDF(inspection)}
+                              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                              title="Export PDF"
+                            >
+                              <Download className="w-5 h-5" />
+                            </button>
+
+                            {/* Email */}
+                            {inspection.status === "complete" && (
+                              <button 
+                                onClick={() => handleManualEmail(inspection)}
+                                disabled={isSending}
+                                className="p-1.5 text-zinc-400 hover:text-blue-400 hover:bg-zinc-800 rounded-lg transition-colors"
+                                title="Send Email"
+                              >
+                                <Mail className="w-5 h-5" />
+                              </button>
+                            )}
+
+                            {/* Delete */}
+                            <button 
+                              onClick={() => handleDelete(inspection.id, inspection.status === "complete")}
+                              className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
+          )}
 
-            {/* House Codes Card */}
-            <div className="bg-zinc-800 p-5 rounded-xl">
-              <h2 className="text-lg font-bold mb-4">House Codes</h2>
-              <p className="text-sm text-zinc-400 mb-4">
-                Manage the list of house codes available in inspection forms
-              </p>
+          {/* TAB: Email Configuration */}
+          {activeTab === "email" && emailConfig && (
+            <div className="space-y-6">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                <h2 className="text-xl font-bold text-white mb-2">Auto-Email Configuration</h2>
+                <p className="text-zinc-400 text-sm mb-6">
+                  Configure automatic email delivery when inspections are completed.
+                </p>
 
-              {/* Add House Code Input */}
-              <div className="mb-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newHouseCode}
-                    onChange={(e) => {
-                      setNewHouseCode(e.target.value);
-                      setHouseError("");
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddHouseCode();
-                      }
-                    }}
-                    placeholder="Enter house code..."
-                    className="flex-1 bg-zinc-900 text-white px-4 py-3 rounded-lg border-2 border-zinc-700 focus:border-green-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleAddHouseCode}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add Code
-                  </button>
+                <div className="space-y-6">
+                  {/* Master Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-zinc-950 rounded-lg border border-zinc-800">
+                    <div>
+                      <h3 className="font-medium text-white">Enable Auto-Send</h3>
+                      <p className="text-sm text-zinc-500">Automatically send emails when inspection is finished</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={emailConfig.autoSendOnComplete}
+                        onChange={(e) => handleSaveEmailConfig({ autoSendOnComplete: e.target.checked, enabled: e.target.checked })}
+                      />
+                      <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                    </label>
+                  </div>
+
+                  {/* Recipients List */}
+                  <div>
+                    <h3 className="font-medium text-white mb-3">Recipients List</h3>
+                    <div className="space-y-2 mb-3">
+                      {emailConfig.recipients.map(email => (
+                        <div key={email} className="flex items-center justify-between bg-zinc-800 px-4 py-2 rounded-lg">
+                          <span className="text-zinc-300">{email}</span>
+                          <button 
+                            onClick={() => handleRemoveRecipient(email)}
+                            className="text-red-400 hover:text-red-300 p-1"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {emailConfig.recipients.length === 0 && (
+                        <p className="text-sm text-orange-400 bg-orange-400/10 p-3 rounded-lg border border-orange-500/20">
+                          No recipients configured. Auto-send will not work.
+                        </p>
+                      )}
+                    </div>
+                    
+                    <form onSubmit={handleAddRecipient} className="flex gap-2">
+                      <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="Add email address..."
+                        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
+                      <button 
+                        type="submit"
+                        className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors font-medium"
+                      >
+                        Add
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Subject Template */}
+                  <div>
+                    <h3 className="font-medium text-white mb-2">Subject Template</h3>
+                    <input
+                      type="text"
+                      value={emailConfig.subject}
+                      onChange={(e) => handleSaveEmailConfig({ subject: e.target.value })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Available variables: {'{{carNumber}}'}, {'{{date}}'}, {'{{site}}'}, {'{{status}}'}
+                    </p>
+                  </div>
                 </div>
-                {houseError && (
-                  <p className="text-red-400 text-sm mt-2">{houseError}</p>
-                )}
-              </div>
-
-              {/* House Code List */}
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {referenceData.houseCodes.length === 0 ? (
-                  <p className="text-center text-zinc-500 py-4">No house codes configured</p>
-                ) : (
-                  referenceData.houseCodes.map(code => (
-                    <div
-                      key={code}
-                      className="bg-zinc-900 p-3 rounded-lg flex items-center justify-between"
-                    >
-                      <span className="font-mono text-lg">{code}</span>
-                      <button
-                        onClick={() => setDeleteConfirm({ type: "house", value: code })}
-                        className="p-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
+          )}
 
-            {/* Last Updated Info */}
-            <div className="text-center text-sm text-zinc-500">
-              Last updated: {formatTimestamp(referenceData.updatedAt)}
-            </div>
-          </div>
-        )}
-      </div>
+          {/* TAB: Internal Storage */}
+          {activeTab === "storage" && (
+            <div className="space-y-6">
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Internal Storage</h2>
+                    <p className="text-zinc-400 text-sm">Compressed copies of completed inspections.</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-400">{formatBytes(totalStorageSize)}</div>
+                    <div className="text-xs text-zinc-500">Total Space Used</div>
+                  </div>
+                </div>
 
-      {/* Delete Single Draft Dialog */}
-      {showDeleteDialog && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
-            <h2 className="text-2xl font-bold mb-4">Delete Draft?</h2>
-            <p className="text-zinc-400 text-lg mb-6">
-              Are you sure you want to delete this draft inspection? This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteDialog(null)}
-                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteDraft(showDeleteDialog)}
-                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
-              >
-                Delete
-              </button>
+                <div className="bg-zinc-950 rounded-lg border border-zinc-800 overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-zinc-900 border-b border-zinc-800 text-zinc-400">
+                      <tr>
+                        <th className="p-3 font-medium">Car Number</th>
+                        <th className="p-3 font-medium">Date</th>
+                        <th className="p-3 font-medium">Size</th>
+                        <th className="p-3 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {compressedStorage.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-6 text-center text-zinc-500">
+                            No compressed records found
+                          </td>
+                        </tr>
+                      ) : (
+                        compressedStorage.map((record) => (
+                          <tr key={record.id} className="hover:bg-zinc-800/30">
+                            <td className="p-3 font-medium text-white">{record.carNumber}</td>
+                            <td className="p-3 text-zinc-400">{new Date(record.completedAt).toLocaleDateString()}</td>
+                            <td className="p-3 text-zinc-400">{formatBytes(record.size)}</td>
+                            <td className="p-3 text-right">
+                              <button 
+                                onClick={() => {
+                                  // Mock download functionality for compressed record
+                                  const a = document.createElement("a");
+                                  a.href = record.dataUrl;
+                                  a.download = `archive-${record.carNumber}.json`;
+                                  a.click();
+                                }}
+                                className="text-blue-400 hover:text-blue-300 text-xs font-medium bg-blue-400/10 px-2 py-1 rounded"
+                              >
+                                Download RAW
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <h4 className="flex items-center gap-2 text-blue-400 font-medium mb-1">
+                    <Archive className="w-4 h-4" /> About Internal Storage
+                  </h4>
+                  <p className="text-sm text-zinc-400">
+                    When an inspection is completed, a "low-space" copy is generated by stripping out large media files (photos/videos). This compressed JSON string is saved permanently in localStorage to provide an audit trail without consuming too much device memory.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
-      )}
-
-      {/* Clear All Dialog */}
-      {showClearAllDialog && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-8 h-8 text-red-500" />
-              <h2 className="text-2xl font-bold">Clear ALL Drafts?</h2>
-            </div>
-            <p className="text-zinc-400 text-lg mb-2">
-              You are about to delete <span className="font-bold text-white">{drafts.length}</span> draft/in-progress inspections.
-            </p>
-            <p className="text-red-400 text-base mb-6 font-semibold">
-              This action cannot be undone!
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowClearAllDialog(false)}
-                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearAll}
-                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
-              >
-                Delete All
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Reference Data Confirmation */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              Remove {deleteConfirm.type === "site" ? "Site" : "House Code"}?
-            </h2>
-            <p className="text-zinc-400 text-lg mb-2">
-              Remove <span className="font-mono font-bold text-white">{deleteConfirm.value}</span> from the list?
-            </p>
-            <p className="text-sm text-zinc-500 mb-6">
-              This won't delete past inspections that used this value.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (deleteConfirm.type === "site") {
-                    handleDeleteSite(deleteConfirm.value);
-                  } else {
-                    handleDeleteHouseCode(deleteConfirm.value);
-                  }
-                }}
-                className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </main>
     </div>
+  );
+}
+
+// Ensure X icon is available if used
+function X(props: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round" {...props}>
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
   );
 }

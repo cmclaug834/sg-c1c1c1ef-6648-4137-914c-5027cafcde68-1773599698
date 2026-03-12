@@ -1,6 +1,6 @@
 import { Inspection } from "@/types/inspection";
-import { saveCompressedInspection } from "./inspectionExport";
-import { emailConfigStorage, fillEmailTemplate, sendInspectionEmail } from "./emailConfig";
+import { saveCompressedInspection, sendInspectionEmail } from "./inspectionExport";
+import { emailConfigStorage, fillEmailTemplate } from "./emailConfig";
 
 const STORAGE_KEY = "gp_inspections_v1";
 const APPROVED_STORAGE_KEY = "gp_approved_inspections_v1";
