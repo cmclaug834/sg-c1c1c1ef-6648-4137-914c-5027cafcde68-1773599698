@@ -2,7 +2,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
 import { 
   ArrowLeft, 
-  User, 
+  User as UserIcon, 
   Building2, 
   Clock, 
   MapPin, 
