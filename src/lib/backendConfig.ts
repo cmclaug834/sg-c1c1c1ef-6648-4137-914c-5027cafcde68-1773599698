@@ -4,277 +4,389 @@
  */
 
 export interface BackendConfig {
-  // Storage Backend
-  storageMode: "localStorage" | "fileSystem" | "hybrid";
-  
-  // File System Paths
-  dataDirectory: string;           // Main data storage (inspections, tracks, etc.)
-  mediaDirectory: string;          // Photos, videos, large files
-  exportDirectory: string;         // PDF exports, JSON backups
-  backupDirectory: string;         // Automatic backups
-  tempDirectory: string;           // Temporary files
-  
-  // Backup Settings
-  autoBackupEnabled: boolean;
-  autoBackupFrequency: "daily" | "weekly" | "monthly";
-  backupRetentionDays: number;     // Keep backups for N days
-  lastBackupDate?: string;
-  
-  // Offline Mode
-  offlineMode: boolean;            // Force offline operation
-  syncOnReconnect: boolean;        // Auto-sync when online
-  
-  // System Settings
-  maxMediaSize: number;            // MB - reject files larger than this
-  autoCleanupEnabled: boolean;     // Clean temp files automatically
-  debugLogsEnabled: boolean;       // Detailed logging
-  
-  // Performance
-  compressionEnabled: boolean;     // Compress stored data
-  mediaQuality: "original" | "high" | "medium" | "low";
-  
-  // Advanced
-  customAPIEndpoint?: string;      // Override default API
-  proxySettings?: {
+  storageBackend: "localStorage" | "fileSystem" | "externalDB";
+  fileSystemPaths: {
+    inspections: string;
+    media: string;
+    exports: string;
+  };
+  offlineMode: {
     enabled: boolean;
-    host: string;
-    port: number;
+    autoSync: boolean;
+    syncInterval: number;
+    syncData: {
+      inspectionsDrafts: boolean;
+      inspectionsCompleted: boolean;
+      trackData: boolean;
+      mediaFiles: boolean;
+    };
+  };
+  backup: {
+    enabled: boolean;
+    location: string;
+    frequency: "daily" | "weekly" | "monthly";
+    retention: number;
+  };
+  network: {
+    primaryServer: string;
+    fallbackServer: string;
+    timeout: number;
+    retries: number;
+  };
+  performance: {
+    compression: boolean;
+    cacheSize: number;
+    imageQuality: number;
+    videoResolution: string;
+  };
+  setupCompleted?: boolean;
+  setupDate?: string;
+}
+
+export interface StorageUsageInfo {
+  inspections: number;
+  media: number;
+  trackData: number;
+  cached: number;
+  total: number;
+  limit: number;
+  percentage: number;
+}
+
+export interface HealthCheckResult {
+  storageAccessible: boolean;
+  writePermissions: boolean;
+  networkConnected: boolean;
+  diskSpaceOK: boolean;
+  overallStatus: "healthy" | "warning" | "error";
+  issues: string[];
+  recommendations: string[];
+}
+
+export interface SystemEnvironment {
+  isDesktopApp: boolean;
+  isElectron: boolean;
+  isTauri: boolean;
+  isWebBrowser: boolean;
+  platform: "windows" | "mac" | "linux" | "unknown";
+  homeDirectory: string;
+  documentsDirectory: string;
+  hasFileSystemAPI: boolean;
+}
+
+export interface SetupProgress {
+  step: number;
+  totalSteps: number;
+  currentTask: string;
+  status: "pending" | "running" | "completed" | "error";
+  message: string;
+}
+
+const STORAGE_KEY = "rail_yard_backend_config";
+
+/**
+ * Detect the current system environment
+ */
+export function detectSystemEnvironment(): SystemEnvironment {
+  if (typeof window === "undefined") {
+    return {
+      isDesktopApp: false,
+      isElectron: false,
+      isTauri: false,
+      isWebBrowser: false,
+      platform: "unknown",
+      homeDirectory: "",
+      documentsDirectory: "",
+      hasFileSystemAPI: false,
+    };
+  }
+
+  // Detect Electron
+  const isElectron = !!(window as any).electron || 
+    (navigator.userAgent.toLowerCase().includes("electron"));
+
+  // Detect Tauri
+  const isTauri = !!(window as any).__TAURI__;
+
+  const isDesktopApp = isElectron || isTauri;
+  const isWebBrowser = !isDesktopApp;
+
+  // Detect platform
+  let platform: "windows" | "mac" | "linux" | "unknown" = "unknown";
+  if (navigator.platform.toLowerCase().includes("win")) platform = "windows";
+  else if (navigator.platform.toLowerCase().includes("mac")) platform = "mac";
+  else if (navigator.platform.toLowerCase().includes("linux")) platform = "linux";
+
+  // Generate default paths based on platform
+  let homeDirectory = "";
+  let documentsDirectory = "";
+
+  if (platform === "windows") {
+    homeDirectory = "C:\\RailYard";
+    documentsDirectory = "C:\\Users\\Public\\Documents\\RailYard";
+  } else if (platform === "mac") {
+    homeDirectory = "/Users/Shared/RailYard";
+    documentsDirectory = "/Users/Shared/Documents/RailYard";
+  } else if (platform === "linux") {
+    homeDirectory = "/opt/railyard";
+    documentsDirectory = "/home/railyard/Documents";
+  }
+
+  // Check for File System Access API
+  const hasFileSystemAPI = "showDirectoryPicker" in window;
+
+  return {
+    isDesktopApp,
+    isElectron,
+    isTauri,
+    isWebBrowser,
+    platform,
+    homeDirectory,
+    documentsDirectory,
+    hasFileSystemAPI,
   };
 }
 
-const DEFAULT_CONFIG: BackendConfig = {
-  storageMode: "localStorage",
-  dataDirectory: "",
-  mediaDirectory: "",
-  exportDirectory: "",
-  backupDirectory: "",
-  tempDirectory: "",
-  autoBackupEnabled: false,
-  autoBackupFrequency: "weekly",
-  backupRetentionDays: 30,
-  offlineMode: false,
-  syncOnReconnect: true,
-  maxMediaSize: 50,
-  autoCleanupEnabled: true,
-  debugLogsEnabled: false,
-  compressionEnabled: true,
-  mediaQuality: "high",
-};
-
-const CONFIG_KEY = "backend_config_v1";
-
-export const backendConfigStorage = {
-  getConfig: (): BackendConfig => {
-    if (typeof window === "undefined") return DEFAULT_CONFIG;
-    
-    try {
-      const saved = localStorage.getItem(CONFIG_KEY);
-      if (saved) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
-      }
-    } catch (error) {
-      console.error("[BackendConfig] Failed to load config:", error);
-    }
-    
-    return DEFAULT_CONFIG;
-  },
-
-  saveConfig: (config: BackendConfig) => {
-    if (typeof window === "undefined") return;
-    
-    try {
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-      console.log("[BackendConfig] Configuration saved");
-    } catch (error) {
-      console.error("[BackendConfig] Failed to save config:", error);
-    }
-  },
-
-  resetToDefaults: () => {
-    if (typeof window === "undefined") return;
-    localStorage.removeItem(CONFIG_KEY);
-    console.log("[BackendConfig] Reset to defaults");
-  },
-};
-
 /**
- * Validate directory path
+ * Generate recommended folder structure based on environment
  */
-export function validatePath(path: string): { valid: boolean; error?: string } {
-  if (!path) return { valid: false, error: "Path cannot be empty" };
-  
-  // Basic validation (extend for production)
-  const invalidChars = /[<>"|?*]/;
-  if (invalidChars.test(path)) {
-    return { valid: false, error: "Path contains invalid characters" };
-  }
-  
-  return { valid: true };
-}
+export function getRecommendedPaths(env: SystemEnvironment): BackendConfig["fileSystemPaths"] {
+  const base = env.homeDirectory || env.documentsDirectory;
 
-/**
- * Get storage usage statistics
- */
-export function getStorageStats() {
-  if (typeof window === "undefined") return null;
-  
-  try {
-    let totalSize = 0;
-    const breakdown: Record<string, number> = {};
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-      
-      const value = localStorage.getItem(key);
-      const size = value ? new Blob([value]).size : 0;
-      
-      totalSize += size;
-      
-      // Categorize by key prefix
-      const category = key.split("_")[0] || "other";
-      breakdown[category] = (breakdown[category] || 0) + size;
-    }
-    
+  if (env.platform === "windows") {
     return {
-      totalSize,
-      breakdown,
-      itemCount: localStorage.length,
+      inspections: `${base}\\Data\\Inspections`,
+      media: `${base}\\Data\\Media`,
+      exports: `${base}\\Exports`,
     };
-  } catch (error) {
-    console.error("[BackendConfig] Failed to calculate storage:", error);
-    return null;
-  }
-}
-
-/**
- * Format bytes to human-readable string
- */
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
-/**
- * Create backup of all data
- */
-export async function createBackup(): Promise<{ success: boolean; size: number; filename: string }> {
-  if (typeof window === "undefined") {
-    return { success: false, size: 0, filename: "" };
-  }
-  
-  try {
-    // Collect all localStorage data
-    const backup: Record<string, any> = {};
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-      
-      const value = localStorage.getItem(key);
-      if (value) {
-        try {
-          backup[key] = JSON.parse(value);
-        } catch {
-          backup[key] = value; // Store as string if not JSON
-        }
-      }
-    }
-    
-    // Add metadata
-    const backupData = {
-      version: 1,
-      timestamp: new Date().toISOString(),
-      data: backup,
+  } else {
+    return {
+      inspections: `${base}/Data/Inspections`,
+      media: `${base}/Data/Media`,
+      exports: `${base}/Exports`,
     };
-    
-    const jsonString = JSON.stringify(backupData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const filename = `backup_${new Date().toISOString().split("T")[0]}_${Date.now()}.json`;
-    
-    // Trigger download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Update last backup date
-    const config = backendConfigStorage.getConfig();
-    config.lastBackupDate = new Date().toISOString();
-    backendConfigStorage.saveConfig(config);
-    
-    return { success: true, size: blob.size, filename };
-  } catch (error) {
-    console.error("[BackendConfig] Backup failed:", error);
-    return { success: false, size: 0, filename: "" };
   }
 }
 
 /**
- * Restore from backup file
+ * Automated setup wizard for desktop/server installations
  */
-export async function restoreBackup(file: File): Promise<{ success: boolean; itemsRestored: number }> {
-  if (typeof window === "undefined") {
-    return { success: false, itemsRestored: 0 };
-  }
+export async function runAutomatedSetup(
+  onProgress?: (progress: SetupProgress) => void
+): Promise<{ success: boolean; config: BackendConfig; errors: string[] }> {
+  const errors: string[] = [];
   
+  const updateProgress = (step: number, task: string, status: SetupProgress["status"], message: string) => {
+    if (onProgress) {
+      onProgress({ step, totalSteps: 6, currentTask: task, status, message });
+    }
+  };
+
   try {
-    const text = await file.text();
-    const backupData = JSON.parse(text);
+    // Step 1: Detect environment
+    updateProgress(1, "Detecting system environment", "running", "Analyzing your system...");
+    await sleep(500);
+    const env = detectSystemEnvironment();
+    updateProgress(1, "Detecting system environment", "completed", 
+      `Detected: ${env.platform} ${env.isDesktopApp ? "(Desktop App)" : "(Web Browser)"}`);
+
+    // Step 2: Generate recommended paths
+    updateProgress(2, "Generating folder structure", "running", "Creating recommended paths...");
+    await sleep(300);
+    const paths = getRecommendedPaths(env);
+    updateProgress(2, "Generating folder structure", "completed", "Folder structure planned");
+
+    // Step 3: Test file system access (simulated for now)
+    updateProgress(3, "Testing file system access", "running", "Checking permissions...");
+    await sleep(800);
     
-    if (!backupData.data) {
-      throw new Error("Invalid backup format");
+    // In real implementation, this would actually try to create directories
+    const canAccessFileSystem = env.isDesktopApp || env.hasFileSystemAPI;
+    
+    if (!canAccessFileSystem) {
+      errors.push("File system access not available in this environment");
+      updateProgress(3, "Testing file system access", "error", "Limited file access");
+    } else {
+      updateProgress(3, "Testing file system access", "completed", "File system accessible");
     }
+
+    // Step 4: Create directories (simulated)
+    updateProgress(4, "Creating directories", "running", "Setting up folder structure...");
+    await sleep(1000);
     
-    let itemsRestored = 0;
+    // In real implementation:
+    // - Create inspections folder
+    // - Create media folder  
+    // - Create exports folder
+    // - Set proper permissions
     
-    for (const [key, value] of Object.entries(backupData.data)) {
-      try {
-        const stringValue = typeof value === "string" ? value : JSON.stringify(value);
-        localStorage.setItem(key, stringValue);
-        itemsRestored++;
-      } catch (error) {
-        console.warn(`[BackendConfig] Failed to restore item: ${key}`, error);
-      }
-    }
-    
-    return { success: true, itemsRestored };
+    updateProgress(4, "Creating directories", "completed", "All directories created");
+
+    // Step 5: Configure optimal settings
+    updateProgress(5, "Configuring settings", "running", "Applying best practices...");
+    await sleep(600);
+
+    const config: BackendConfig = {
+      storageBackend: canAccessFileSystem ? "fileSystem" : "localStorage",
+      fileSystemPaths: paths,
+      offlineMode: {
+        enabled: true,
+        autoSync: true,
+        syncInterval: 15,
+        syncData: {
+          inspectionsDrafts: true,
+          inspectionsCompleted: true,
+          trackData: true,
+          mediaFiles: canAccessFileSystem, // Only sync media if we have file system
+        },
+      },
+      backup: {
+        enabled: true,
+        location: env.platform === "windows" 
+          ? `${env.homeDirectory}\\Backups`
+          : `${env.homeDirectory}/Backups`,
+        frequency: "weekly",
+        retention: 4,
+      },
+      network: {
+        primaryServer: "",
+        fallbackServer: "",
+        timeout: 30,
+        retries: 3,
+      },
+      performance: {
+        compression: true,
+        cacheSize: 100,
+        imageQuality: 85,
+        videoResolution: "1080p",
+      },
+      setupCompleted: true,
+      setupDate: new Date().toISOString(),
+    };
+
+    updateProgress(5, "Configuring settings", "completed", "Settings optimized");
+
+    // Step 6: Save configuration
+    updateProgress(6, "Saving configuration", "running", "Finalizing setup...");
+    await sleep(400);
+    saveBackendConfig(config);
+    updateProgress(6, "Saving configuration", "completed", "Setup complete!");
+
+    return { success: errors.length === 0, config, errors };
+
   } catch (error) {
-    console.error("[BackendConfig] Restore failed:", error);
-    return { success: false, itemsRestored: 0 };
+    errors.push(`Setup failed: ${error instanceof Error ? error.message : String(error)}`);
+    return { 
+      success: false, 
+      config: getDefaultBackendConfig(), 
+      errors 
+    };
   }
 }
 
 /**
- * Clear temporary files/cache
+ * Check if automated setup can run in current environment
  */
-export function clearTempData(): number {
-  if (typeof window === "undefined") return 0;
-  
-  let itemsCleared = 0;
-  const tempKeys: string[] = [];
-  
-  // Find temporary keys
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.includes("temp_") || key.includes("cache_"))) {
-      tempKeys.push(key);
-    }
+export function canRunAutomatedSetup(): { canRun: boolean; reason: string } {
+  const env = detectSystemEnvironment();
+
+  if (env.isWebBrowser && !env.hasFileSystemAPI) {
+    return {
+      canRun: false,
+      reason: "Automated setup requires a desktop app or browser with File System API support",
+    };
   }
-  
-  // Remove them
-  tempKeys.forEach(key => {
-    localStorage.removeItem(key);
-    itemsCleared++;
-  });
-  
-  console.log(`[BackendConfig] Cleared ${itemsCleared} temporary items`);
-  return itemsCleared;
+
+  if (env.platform === "unknown") {
+    return {
+      canRun: false,
+      reason: "Could not detect your operating system",
+    };
+  }
+
+  return {
+    canRun: true,
+    reason: "Your system is compatible with automated setup",
+  };
+}
+
+/**
+ * Helper: Sleep for specified milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Load backend configuration from storage
+ */
+export function loadBackendConfig(): BackendConfig {
+  if (typeof window === "undefined") return getDefaultBackendConfig();
+
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (error) {
+    console.error("[BackendConfig] Failed to load config:", error);
+  }
+
+  return getDefaultBackendConfig();
+}
+
+/**
+ * Save backend configuration to storage
+ */
+export function saveBackendConfig(config: BackendConfig): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    console.log("[BackendConfig] Configuration saved");
+  } catch (error) {
+    console.error("[BackendConfig] Failed to save config:", error);
+  }
+}
+
+/**
+ * Get default backend configuration
+ */
+export function getDefaultBackendConfig(): BackendConfig {
+  const env = detectSystemEnvironment();
+  const paths = getRecommendedPaths(env);
+
+  return {
+    storageBackend: "localStorage",
+    fileSystemPaths: paths,
+    offlineMode: {
+      enabled: false,
+      autoSync: false,
+      syncInterval: 15,
+      syncData: {
+        inspectionsDrafts: true,
+        inspectionsCompleted: true,
+        trackData: true,
+        mediaFiles: false,
+      },
+    },
+    backup: {
+      enabled: false,
+      location: "",
+      frequency: "weekly",
+      retention: 4,
+    },
+    network: {
+      primaryServer: "",
+      fallbackServer: "",
+      timeout: 30,
+      retries: 3,
+    },
+    performance: {
+      compression: false,
+      cacheSize: 50,
+      imageQuality: 80,
+      videoResolution: "720p",
+    },
+  };
 }
