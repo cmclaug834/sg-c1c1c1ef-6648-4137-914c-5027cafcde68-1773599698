@@ -1,6 +1,20 @@
 import { useApp } from "@/contexts/AppContext";
 import { useRouter } from "next/router";
-import { ArrowLeft, ChevronRight, FileText, Settings as SettingsIcon, HardDrive } from "lucide-react";
+import { 
+  ArrowLeft, 
+  User, 
+  Building2, 
+  Clock, 
+  MapPin, 
+  ChevronRight, 
+  Settings2, 
+  Trash2, 
+  CheckCircle2, 
+  Calendar, 
+  Database, 
+  Mail,
+  Server
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
 import type { DebugLogEntry } from "@/lib/diagnostics";
