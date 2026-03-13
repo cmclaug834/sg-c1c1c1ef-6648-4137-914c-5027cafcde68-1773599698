@@ -1,1569 +1,812 @@
 # Rail Yard Tracker - Complete Project Export
 
-**Generated:** 2025-12-16 21:20:00 UTC
-**Tech Stack:** Next.js 15.2 (Pages Router), TypeScript, React 18
-**Version:** 2.0.0 - Enhanced Search & Shift Status
+**Version:** 2.0.0  
+**Export Date:** March 13, 2026  
+**Project Type:** Multi-Device Inspection System  
+**Tech Stack:** Next.js 15 (Pages Router) + TypeScript + Tailwind CSS
 
 ---
 
-## PROJECT OVERVIEW
+## 📦 Package Contents
 
-Rail Yard Tracker is a mobile-first web application designed for rail yard morning inventory checks. Built for one-handed operation with glove-friendly touch targets, it enables crews to track, confirm, and manage rail cars across multiple tracks.
+This export contains the complete Rail Yard Tracker application with:
 
-### Key Features
-- **Track Management:** 12 default tracks (AS28-AS48) with enable/disable control
-- **Car Tracking:** Add, confirm, unconfirm, move, and remove rail cars
-- **Shift Status Icons:** Visual indicators for cars checked during current shift
-- **Enhanced Search:** Search both track names and car IDs with smart result ordering
-- **Crew Sessions:** Name + Crew ID with automatic shift-based expiration
-- **Profile Memory:** Auto-suggests recent crew profiles with history
-- **Bulk Import:** Paste CN lists, auto-extract and validate car IDs
-- **Car Reorder:** Tap-based sequencing for accurate track order
-- **Multi-Select Mode:** Batch move and delete operations
-- **Settings:** Branding customization, shift times, track management
-
-### Data Integrity
-- **Unique Car IDs:** crypto.randomUUID() with fallback to timestamp-based IDs
-- **Duplicate Detection:** Prevents same car from appearing on multiple tracks
-- **Automatic Data Repair:** Fixes missing/duplicate IDs on application load
-- **Diagnostic System:** Debug logs for troubleshooting state issues
-- **Normalized Car IDs:** Consistent format (MARK 123456) across the app
-
-### UX Design Principles
-- **Glove-Friendly:** 44px+ touch targets for cold-weather operation
-- **High Contrast:** Dark theme (zinc-900) with clear visual hierarchy
-- **One-Handed:** Bottom navigation, minimal scrolling required
-- **Mobile-First:** Safe area insets, responsive layouts
-- **Offline-Ready:** Full localStorage persistence, no backend required
+✅ **Multi-device sync system** - Desktop server + mobile clients  
+✅ **Advanced role-based access control** - Admin/Inspector/Viewer  
+✅ **Automated health monitoring** - 15 system checks  
+✅ **Offline-capable** - Works without internet  
+✅ **Real-time sync** - 30-second periodic sync  
+✅ **QR code connection** - Easy mobile setup  
+✅ **Complete inspection workflow** - Fix for signature clearing bug  
+✅ **Proper navigation** - Fix for back button behavior  
 
 ---
 
-## PROJECT STRUCTURE
+## 🚀 Quick Start (Desktop Server)
+
+### Prerequisites
+
+```bash
+- Node.js 18+ installed
+- npm or yarn package manager
+- Windows/macOS/Linux desktop computer
+```
+
+### Installation Steps
+
+```bash
+# 1. Extract the package
+unzip rail-yard-tracker-v2.0.0.zip
+cd rail-yard-tracker
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment (optional)
+cp .env.example .env.local
+# Edit .env.local with your settings
+
+# 4. Build the application
+npm run build
+
+# 5. Start the server
+npm start
+
+# Server will start on http://localhost:3000
+# Your local IP: http://192.168.1.XXX:3000
+```
+
+### First-Time Setup
+
+```
+1. Open browser: http://localhost:3000
+2. Go to Settings → Backend & System Settings
+3. Click "Start Quick Setup" wizard
+4. Wait for automated configuration
+5. Go to Settings → Network & Server
+6. Enable "Desktop Server"
+7. Create user accounts for mobile devices
+8. Share QR code with mobile users
+```
+
+---
+
+## 📱 Mobile Device Setup
+
+### Connect Mobile/Tablet
+
+```
+1. Connect to same WiFi as desktop
+2. Scan QR code from desktop OR
+   Type server URL: http://192.168.1.XXX:3000
+3. Login with credentials from desktop admin
+4. Start using the app!
+```
+
+### Mobile Users
+
+- Inspectors can create/edit inspections
+- Viewers can read-only access
+- Auto-sync every 30 seconds
+- Works offline, syncs when reconnected
+
+---
+
+## 📁 Project Structure
 
 ```
 rail-yard-tracker/
 ├── src/
-│   ├── components/
-│   │   ├── ui/ (shadcn components - 45+ files)
+│   ├── components/        # Reusable UI components
+│   │   ├── ui/           # shadcn/ui component library
 │   │   ├── BottomNav.tsx
+│   │   ├── OutboundConfirmDialog.tsx
 │   │   ├── DuplicateCarDialog.tsx
-│   │   ├── ThemeSwitch.tsx
-│   │   ├── TrackPickerModal.tsx
-│   │   └── UnconfirmDialog.tsx
-│   ├── contexts/
-│   │   ├── AppContext.tsx (455 lines)
-│   │   └── ThemeProvider.tsx
-│   ├── hooks/
+│   │   └── ...
+│   │
+│   ├── contexts/         # React context providers
+│   │   ├── AppContext.tsx     # Global app state
+│   │   └── ThemeProvider.tsx  # Dark/light theme
+│   │
+│   ├── hooks/           # Custom React hooks
 │   │   ├── use-mobile.tsx
 │   │   └── use-toast.ts
-│   ├── lib/
-│   │   ├── carIdFormatter.ts
-│   │   ├── carImportParser.ts
-│   │   ├── diagnostics.ts
-│   │   ├── profileStorage.ts
-│   │   ├── storage.ts
-│   │   └── utils.ts
-│   ├── pages/
-│   │   ├── _app.tsx
-│   │   ├── _document.tsx
-│   │   ├── index.tsx (Landing/Login - 293 lines)
-│   │   ├── tracks.tsx (Track List - 376 lines)
-│   │   ├── settings.tsx (703 lines)
-│   │   ├── track/
-│   │   │   ├── [id].tsx (Track Detail - 1170 lines)
-│   │   │   └── [id]/import.tsx (332 lines)
-│   │   ├── reorder/
-│   │   │   ├── index.tsx (45 lines)
-│   │   │   └── [id].tsx (243 lines)
-│   │   └── exceptions/
-│   │       └── [id].tsx (264 lines)
-│   ├── styles/
+│   │
+│   ├── lib/             # Core business logic
+│   │   ├── storage.ts           # Track/car storage
+│   │   ├── inspectionStorage.ts # Inspection CRUD
+│   │   ├── auth.ts              # User authentication
+│   │   ├── sync.ts              # Multi-device sync
+│   │   ├── systemHealth.ts      # Health monitoring
+│   │   ├── backendConfig.ts     # System configuration
+│   │   └── ...
+│   │
+│   ├── pages/           # Next.js routes
+│   │   ├── index.tsx              # Home/tracks list
+│   │   ├── tracks.tsx             # All tracks view
+│   │   ├── inspections.tsx        # Inspections list
+│   │   ├── settings.tsx           # Settings hub
+│   │   │
+│   │   ├── api/                   # Backend API routes
+│   │   │   ├── auth/             # Login/logout/session
+│   │   │   ├── inspections/      # Inspection CRUD
+│   │   │   ├── tracks/           # Track CRUD
+│   │   │   ├── users/            # User management
+│   │   │   └── sync/             # Sync endpoints
+│   │   │
+│   │   ├── track/[id]/
+│   │   │   ├── index.tsx         # Track detail page
+│   │   │   └── import.tsx        # Import cars
+│   │   │
+│   │   ├── inspection/
+│   │   │   ├── new.tsx           # Start inspection
+│   │   │   └── [id]/
+│   │   │       ├── page/1.tsx   # Inspection step 1
+│   │   │       └── page/2.tsx   # Inspection step 2
+│   │   │
+│   │   ├── settings/
+│   │   │   ├── backend.tsx           # Backend config
+│   │   │   ├── network-server.tsx    # Server setup
+│   │   │   ├── system-health.tsx     # Health checks
+│   │   │   ├── manage-tracks.tsx     # Track management
+│   │   │   └── cn-rail-api.tsx       # API integration
+│   │   │
+│   │   └── inspections/
+│   │       ├── admin.tsx         # Admin dashboard
+│   │       └── review.tsx        # Review inspections
+│   │
+│   ├── styles/          # Global styles
 │   │   └── globals.css
-│   └── types/
-│       └── index.ts
-├── public/
+│   │
+│   └── types/           # TypeScript definitions
+│       ├── index.ts
+│       ├── inspection.ts
+│       └── auth.ts
+│
+├── public/              # Static assets
 │   └── favicon.ico
-├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-├── next.config.mjs
-└── vercel.json
+│
+├── package.json         # Dependencies
+├── tsconfig.json        # TypeScript config
+├── tailwind.config.ts   # Tailwind CSS config
+├── next.config.mjs      # Next.js config
+└── README.md           # This file
 ```
 
 ---
 
-## CORE TYPE DEFINITIONS
+## 🔧 Configuration Files
 
-**File:** `src/types/index.ts`
+### .env.local (Environment Variables)
+
+```env
+# Optional: Custom port (default: 3000)
+PORT=3000
+
+# Optional: Custom host
+HOST=0.0.0.0
+
+# Optional: Node environment
+NODE_ENV=production
+
+# Optional: External database (future)
+# DATABASE_URL=postgresql://...
+# SUPABASE_URL=https://...
+# SUPABASE_ANON_KEY=...
+```
+
+### Backend Configuration
+
+Configured via UI: **Settings → Backend & System Settings**
 
 ```typescript
-export interface RailCar {
-  id: string;
-  carNumber: string;
-  carType: string;
-  confirmedAt?: string;
-  confirmedBy?: string;
-  status: "pending" | "confirmed" | "missing";
+{
+  storageBackend: "fileSystem" | "localStorage" | "externalDb",
+  
+  fileSystemPaths: {
+    inspections: "C:\\RailYard\\Data\\Inspections",
+    media: "C:\\RailYard\\Data\\Media",
+    exports: "C:\\RailYard\\Exports"
+  },
+  
+  offlineMode: {
+    enabled: true,
+    autoSync: true,
+    syncInterval: 15  // minutes
+  },
+  
+  backup: {
+    enabled: true,
+    location: "C:\\RailYard\\Backups",
+    frequency: "weekly",
+    retention: 4
+  }
 }
+```
 
-export interface MoveLog {
-  id: string;
-  carId: string;
-  carNumber: string;
-  fromTrack: string;
-  toTrack: string;
-  timestamp: string;
-  crewId: string;
-  reason: "MORNING_RECONCILE" | "DAY_MOVE";
+### Network Configuration
+
+Configured via UI: **Settings → Network & Server**
+
+```typescript
+{
+  serverEnabled: true,
+  serverUrl: "http://192.168.1.100:3000",
+  syncInterval: 30,  // seconds
+  autoSync: true
 }
+```
 
-export interface Track {
+---
+
+## 🔐 User Roles & Permissions
+
+### Default Admin Account
+
+```
+Username: admin
+Password: admin123
+Role: Admin
+
+⚠️ Change password immediately after first login!
+```
+
+### Role Capabilities
+
+| Feature | Admin | Inspector | Viewer |
+|---------|-------|-----------|--------|
+| Create Inspections | ✅ | ✅ | ❌ |
+| Edit Inspections | ✅ | ✅ | ❌ |
+| Delete Inspections | ✅ | ❌ | ❌ |
+| View Inspections | ✅ | ✅ | ✅ |
+| Manage Tracks | ✅ | ❌ | ❌ |
+| Create Users | ✅ | ❌ | ❌ |
+| System Config | ✅ | ❌ | ❌ |
+| Export Data | ✅ | ✅ | ✅ |
+
+---
+
+## 📡 API Reference
+
+### Authentication Endpoints
+
+```
+POST /api/auth/login
+Body: { username: string, password: string }
+Response: { user: User, session: AuthSession }
+
+POST /api/auth/logout
+Headers: { Authorization: Bearer <token> }
+Response: { success: boolean }
+
+GET /api/auth/session
+Headers: { Authorization: Bearer <token> }
+Response: { user: User, session: AuthSession }
+```
+
+### Inspection Endpoints
+
+```
+GET /api/inspections
+Headers: { Authorization: Bearer <token> }
+Response: { inspections: Inspection[] }
+
+POST /api/inspections
+Headers: { Authorization: Bearer <token> }
+Body: { inspection: Inspection }
+Response: { inspection: Inspection }
+
+GET /api/inspections/[id]
+Headers: { Authorization: Bearer <token> }
+Response: { inspection: Inspection }
+
+PUT /api/inspections/[id]
+Headers: { Authorization: Bearer <token> }
+Body: { inspection: Partial<Inspection> }
+Response: { inspection: Inspection }
+
+DELETE /api/inspections/[id]
+Headers: { Authorization: Bearer <token> }
+Response: { success: boolean }
+```
+
+### Track Endpoints
+
+```
+GET /api/tracks
+Response: { tracks: Track[] }
+
+POST /api/tracks
+Headers: { Authorization: Bearer <token> }
+Body: { track: Track }
+Response: { track: Track }
+
+GET /api/tracks/[id]
+Response: { track: Track }
+
+PUT /api/tracks/[id]
+Headers: { Authorization: Bearer <token> }
+Body: { track: Partial<Track> }
+Response: { track: Track }
+
+DELETE /api/tracks/[id]
+Headers: { Authorization: Bearer <token> }
+Response: { success: boolean }
+```
+
+### Sync Endpoints
+
+```
+GET /api/ping
+Response: { success: true, timestamp: string }
+
+POST /api/sync
+Headers: { Authorization: Bearer <token> }
+Body: { changes: Change[] }
+Response: { success: boolean, conflicts: Change[] }
+
+GET /api/sync/latest
+Headers: { Authorization: Bearer <token> }
+Query: ?since=timestamp
+Response: { changes: Change[], timestamp: string }
+```
+
+---
+
+## 🗄️ Data Structure
+
+### Inspection Object
+
+```typescript
+interface Inspection {
+  id: string;
+  trackId: string;
+  status: "draft" | "inProgress" | "completed";
+  currentStep: 1 | 2 | 3 | 4;
+  
+  // Step 1: Basic Info
+  site: string;
+  date: string;
+  house: string;
+  vehicleId: string;
+  
+  // Step 2: Accept/Reject
+  decision: "accept" | "reject" | "";
+  rejectReason?: string;
+  initialPhotos: string[];
+  
+  // Step 3: Pre-Inspection Signature
+  inspectorSignatures: {
+    initial?: {
+      signature: string;
+      timestamp: string;
+      inspector: string;
+    };
+    final?: {
+      signature: string;
+      timestamp: string;
+      inspector: string;
+    };
+  };
+  
+  // Step 4: Final Inspection
+  finalPhotos: string[];
+  loadNumber?: string;
+  notes?: string;
+  
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  lastModifiedBy: string;
+}
+```
+
+### Track Object
+
+```typescript
+interface Track {
   id: string;
   name: string;
-  cars: RailCar[];
-  lastChecked?: string;
-  lastCheckClearedAt?: string;
-  enabled?: boolean;
+  location: string;
+  cars: Car[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface User {
+interface Car {
   id: string;
-  name: string;
-  crewId: string;
+  carNumber: string;
+  position: number;
+  status: "pending" | "inspected" | "outbound";
+  inspectionId?: string;
+  notes?: string;
 }
+```
 
-export interface AppSettings {
-  requireUnconfirmDialog: boolean;
-  resolveOnDone?: boolean;
-  showMissingInList?: boolean;
-  movePlacement?: "append" | "prepend";
-  adminManageTracks?: boolean;
-  shiftChangeA?: string;
-  shiftChangeB?: string;
+### User Object
+
+```typescript
+interface User {
+  id: string;
+  username: string;
+  displayName: string;
+  role: "admin" | "inspector" | "viewer";
+  createdAt: string;
+  lastLogin?: string;
 }
 ```
 
 ---
 
-## KEY FEATURES DETAILED
+## 🧪 Testing & Validation
 
-### 1. Enhanced Search System
+### Run System Health Check
 
-**Location:** `/tracks` (Morning Yard Check page)
+```
+Settings → System Health & Stability → Run Health Check
 
-**Capabilities:**
-- Searches both track names and car IDs simultaneously
-- Uses `normalizeCarId()` for accurate car number matching
-- Smart result ordering based on query type
+Validates:
+  ✅ Storage layer (4 checks)
+  ✅ API layer (3 checks)
+  ✅ Sync engine (2 checks)
+  ✅ Auth system (3 checks)
+  ✅ Data integrity (2 checks)
+  ✅ UI components (1 check)
+  ✅ Feature interactions (5 tests)
 
-**Search Logic:**
-```typescript
-const hasDigits = /\d/.test(searchQuery);
-
-matchingTracks = tracks.filter(track =>
-  track.enabled !== false && 
-  track.name.toLowerCase().includes(searchLower)
-);
-
-matchingCars = tracks.flatMap(track =>
-  track.cars
-    .filter(car => normalizeCarId(car.carNumber).toLowerCase().includes(searchLower))
-    .map(car => ({ car, track }))
-);
-
-showCarsFirst = hasDigits && matchingCars.length > 0;
+Total: 15 automated checks
 ```
 
-**Result Display:**
-- **Track Results:** Track name, car count, progress, last checked time
-- **Car Results:** Car number (large), track location, car type, status
-- **Result Ordering:** Cars first if query has digits, tracks first otherwise
+### Manual Testing Checklist
 
-**Navigation:**
-- Tap track → Opens track detail page
-- Tap car → Opens that car's track detail page
-
-**Examples:**
-- Search "AS28" → Shows AS28 track
-- Search "TBOX 663566" → Shows car with track location
-- Search "663566" → Shows matching cars first
-- Search "BOX" → Shows tracks first, then any cars with BOX in number
-
-### 2. Shift Status Icon System
-
-**Location:** `/track/[id]` (Track Detail page)
-
-**Purpose:** Visually distinguish cars checked during current shift vs previous shifts
-
-**Icons:**
-- **BadgeCheck (green):** Car checked this shift
-- **CircleDashed (grey):** Car not checked this shift
-- **AlertTriangle (yellow):** Car marked missing
-
-**Logic:**
-```typescript
-isCheckedThisShift(car):
-  if car.status !== "confirmed": return false
-  if !car.confirmedAt: return false
-  if !track.lastCheckClearedAt: return true
-  return new Date(car.confirmedAt) > new Date(track.lastCheckClearedAt)
 ```
+Desktop Setup:
+  ☐ Quick Setup wizard completes successfully
+  ☐ Server starts on local network
+  ☐ QR code generates correctly
+  ☐ Admin can create user accounts
 
-**Visual Layout:**
+Mobile Connection:
+  ☐ QR code scan connects successfully
+  ☐ Login works with created credentials
+  ☐ Sync status shows "Connected"
+  ☐ Can view tracks from desktop
+
+Inspection Flow:
+  ☐ Create new inspection
+  ☐ Fill Step 1 fields
+  ☐ Sign pre-inspection signature
+  ☐ Navigate to Step 2
+  ☐ All Step 1 data persists (BUG FIX VERIFIED)
+  ☐ Fill Step 2 fields
+  ☐ Sign final signature
+  ☐ Complete inspection
+  ☐ Inspection syncs to other devices
+
+Navigation:
+  ☐ Back button on Step 1 shows exit confirm
+  ☐ Back button on Step 2 returns to Step 1
+  ☐ No unexpected signature screen (BUG FIX VERIFIED)
+  ☐ Draft saves and resumes correctly
+
+Multi-Device Sync:
+  ☐ Create inspection on Mobile 1
+  ☐ Wait 30 seconds
+  ☐ Inspection appears on Desktop
+  ☐ Inspection appears on Mobile 2
+  ☐ Edit on Desktop
+  ☐ Changes sync to mobile devices
+
+Permissions:
+  ☐ Admin can delete inspections
+  ☐ Inspector cannot delete inspections
+  ☐ Viewer cannot edit inspections
+  ☐ Viewer cannot create inspections
 ```
-[Shift Icon] [Checkbox] [Car Details]
-   ✅          ✓         TBOX 663566
-                        BOX
-                        Confirmed 2h ago by CREW-001
-```
-
-**Legend:** Displayed below progress bar
-```
-[✅ green] Checked this shift  [⭕ grey] Not checked  [⚠️ yellow] Missing
-```
-
-**Filter Integration:**
-- "Unconfirmed only" toggle filters by `!isCheckedThisShift(car)`
-- Shows only cars that need attention this shift
-- More accurate than simple status filtering
-
-**Workflow:**
-1. Morning: All cars show CircleDashed (not checked)
-2. Confirmation: Checkbox turns green, shift icon stays grey
-3. Done: lastCheckClearedAt updates, confirmed cars → BadgeCheck
-4. Next visit: BadgeCheck cars are already done, focus on CircleDashed
-
-### 3. Multi-Select Mode
-
-**Location:** `/track/[id]` (Track Detail page)
-
-**Activation:** Tap "Select" button in header (next to "Unconfirmed only")
-
-**Features:**
-- Select multiple cars with tap
-- Batch move to another track
-- Batch delete from track
-- Selection count displayed in button
-
-**UI Changes in Selection Mode:**
-- Checkboxes replaced with selection indicators
-- Row menu (⋮) hidden
-- Bottom action bar shows: Cancel | Move (N) | Delete (N)
-
-**Batch Operations:**
-- **Move:** Opens track picker, moves all selected cars
-- **Delete:** Shows confirmation, removes all selected cars
-- Both operations log to localStorage for history
-
-**Exit:** Tap "Cancel" or complete batch operation
-
-### 4. Car Import System
-
-**Location:** `/track/[id]/import`
-
-**Parser:** `src/lib/carImportParser.ts`
-
-**Accepts Formats:**
-- MARK123456
-- MARK 123456
-- MARK-123456
-- Multiple cars per line
-- 2-4 letter marks, 3-7 digit numbers
-
-**Process:**
-1. Paste CN list into textarea
-2. Tap "Preview Import"
-3. Review three sections:
-   - Will Add (green)
-   - Skipped - Duplicates (yellow)
-   - Unrecognized Lines (red)
-4. Tap car to expand and see source line
-5. Tap "Add Cars" to import
-
-**Duplicate Handling:**
-- Detects cars already on any track
-- Shows which track has the duplicate
-- Prevents accidental duplicates
-
-**Normalization:**
-- All car IDs normalized to "MARK 123456" format
-- Consistent with global `normalizeCarId()` function
-
-### 5. Car Reorder System
-
-**Location:** `/reorder/[id]`
-
-**Interface:**
-- **Left Panel:** Current order (tap to move right)
-- **Right Panel:** New order (tap X to remove)
-- **Bottom:** Reset | Cancel | Confirm
-
-**Workflow:**
-1. Navigate to Reorder → Select Track
-2. Tap cars in left panel to add to right panel
-3. Right panel builds new order sequentially
-4. Tap X on right panel to move car back to left
-5. Tap "Confirm order" to save
-
-**Data Handling:**
-- Final order = right panel + remaining left panel
-- Safety net prevents lost cars
-- Logs order update with timestamp and crew ID
-
-**Use Cases:**
-- Reflecting physical track order
-- Prioritizing specific cars
-- Organizing by type or destination
-
-### 6. Crew Session Management
-
-**Location:** `/` (Landing page)
-
-**Features:**
-- Name + Crew ID entry
-- Profile history with auto-suggestions
-- Shift-based session expiration
-- Manual logout via Settings
-
-**Session Logic:**
-```typescript
-computeNextShiftChange(shiftA, shiftB):
-  - Finds next upcoming shift time
-  - Returns ISO timestamp for expiration
-  - Uses configurable shift times from settings
-
-isSessionValid():
-  - Checks if active crew exists
-  - Verifies current time < expiration
-  - Returns true/false
-```
-
-**Session Flow:**
-1. User enters name + crew ID
-2. Profile saved/updated in localStorage
-3. Session expiration calculated based on next shift
-4. Session stored with expiration timestamp
-5. On return: Check validity → Auto-login or re-prompt
-
-**Profile Storage:**
-- Keeps last 10 profiles
-- Sorted by most recently used
-- Shows last used timestamp
-- Dropdown suggestions for quick selection
-
-### 7. Diagnostic System
-
-**Location:** Settings → View Debug Logs
-
-**Purpose:** Troubleshoot state inconsistencies and track operations
-
-**Logged Events:**
-- CONFIRM_CAR
-- UNCONFIRM_CAR
-- DONE_COMMIT_START
-- DONE_AFTER_CONFIRMATIONS
-- DONE_AFTER_UNCONFIRMATIONS
-- DONE_COMMIT_END
-- TOGGLE_CONFIRM_BEFORE
-- TOGGLE_CONFIRM_AFTER
-- BATCH_DELETE_COMPLETE
-- REMOVE_CAR_COMPLETE
-
-**Log Contents:**
-```typescript
-{
-  timestamp: ISO string
-  action: string
-  diagnostic: {
-    trackId: string
-    trackName: string
-    carsLength: number
-    computedConfirmedCars: number
-  }
-  pendingConfirmations: number
-  pendingUnconfirmations: number
-}
-```
-
-**Features:**
-- Last 100 logs kept in localStorage
-- View in modal with formatted display
-- Copy to clipboard for sharing
-- Clear logs button
-
-**Use Cases:**
-- Debugging count mismatches
-- Verifying operation sequences
-- Tracking user actions
-- Support troubleshooting
 
 ---
 
-## STORAGE ARCHITECTURE
+## 🐛 Bug Fixes Included
 
-### LocalStorage Keys
+### Bug #1: Signing Clears Previously Entered Fields ✅
 
-```typescript
-STORAGE_KEYS = {
-  TRACKS: "rail_yard_tracks"
-  USER: "rail_yard_user"
-  SETTINGS: "rail_yard_settings"
-  APP_NAME: "rail_yard_app_name"
-  SITE_NAME: "rail_yard_site_name"
-  ACTIVE_CREW: "rail_yard_active_crew"
-  SESSION_EXPIRES_AT: "rail_yard_session_expires_at"
-  SHIFT_A: "rail_yard_shift_a"
-  SHIFT_B: "rail_yard_shift_b"
-  PROFILES: "rail_yard_profiles"
-  DEBUG_LOGS: "rail_yard_debug_logs"
-  MOVE_LOGS: "rail_yard_move_logs"
-  REMOVE_LOGS: "rail_yard_remove_logs"
-  ORDER_LOGS: "rail_yard_order_logs"
-}
+**Fixed:** Inspection form now uses single source of truth with debounced auto-save.
+
+**Verification:**
 ```
-
-### Data Repair System
-
-**Purpose:** Fix data integrity issues on application load
-
-**Repairs:**
-1. Missing car IDs → Generate unique IDs
-2. Duplicate car IDs → Regenerate duplicates
-3. Legacy count fields → Remove (now computed dynamically)
+1. Start inspection
+2. Fill multiple fields
+3. Sign pre-inspection signature
+4. Navigate back to Step 1
+5. Verify: All fields still have data ✅
+```
 
 **Implementation:**
-```typescript
-repairTrackData(tracks):
-  for each track:
-    for each car:
-      if !car.id or usedIds.has(car.id):
-        Generate new unique ID
-        Log repair action
-        Add to usedIds
-    Remove legacy totalCars/confirmedCars fields
-  Return repaired tracks
-```
+- Single draft object in `inspectionStorage`
+- Debounced save (300ms) on field changes
+- Signature updates preserve all existing fields
+- No form reset on signature save
 
-**Logging:**
-```
-[DATA REPAIR] Track AS28: Fixed car TBOX 663566 - ID (missing) → car-abc123
-[DATA REPAIR] Fixed 3 cars with missing/duplicate IDs
-```
+### Bug #2: Back Button Takes You to Signature ✅
 
-### Dynamic Count Computation
+**Fixed:** Wizard-based navigation with proper step management.
 
-**Principle:** Counts are always computed from cars array, never stored
+**Verification:**
+```
+1. Start inspection (Step 1)
+2. Press back button
+3. Verify: Shows exit confirmation ✅
+4. Advance to Step 2
+5. Press back button
+6. Verify: Returns to Step 1 ✅
+7. Never unexpectedly jumps to signature ✅
+```
 
 **Implementation:**
-```typescript
-computeTrackCounts(cars):
-  return {
-    totalCars: cars.length
-    confirmedCars: cars.filter(c => c.status === "confirmed").length
-  }
-
-TrackWithCounts = Track & {
-  totalCars: number
-  confirmedCars: number
-}
-```
-
-**Benefits:**
-- Eliminates count drift issues
-- Single source of truth (cars array)
-- Automatic consistency
-- Simpler state management
+- `currentStep` field tracks wizard progress
+- Back on Step 1 = exit confirmation
+- Back on Step 2+ = previous step
+- Signature as modal, not separate route
+- Clean browser history (no route pollution)
 
 ---
 
-## COMPONENT ARCHITECTURE
+## 🚀 Deployment Options
 
-### App Context (State Management)
+### Option 1: Local Desktop Server (Recommended)
 
-**File:** `src/contexts/AppContext.tsx`
-
-**Responsibilities:**
-- Track data management
-- Car operations (add, confirm, unconfirm, move, delete)
-- User session management
-- Settings persistence
-- Track order management
-
-**Key Functions:**
-
-```typescript
-addCar(trackId, car)
-  - Generates unique car ID
-  - Adds to track's cars array
-  - Normalizes car number
-
-confirmCar(trackId, carId)
-  - Sets status to "confirmed"
-  - Records timestamp and crew ID
-  - Logs diagnostic
-
-unconfirmCar(trackId, carId)
-  - Sets status to "pending"
-  - Clears timestamp and crew ID
-  - Logs diagnostic
-
-moveCar(carId, fromTrackId, toTrackId, reason)
-  - Validates move (no duplicates)
-  - Logs move operation
-  - Updates both tracks atomically
-  - Returns success boolean
-
-commitTrackOrder(trackId, orderedCarList)
-  - Replaces track car order
-  - Logs order update
-  - Preserves any missing cars (safety net)
-```
-
-**State Structure:**
-```typescript
-{
-  tracks: TrackWithCounts[]
-  currentUser: User | null
-  settings: AppSettings
-  appName: string
-  siteName: string
-}
-```
-
-### Bottom Navigation
-
-**File:** `src/components/BottomNav.tsx`
-
-**Tabs:**
-1. Yard Check (ClipboardList icon)
-2. Reorder (ArrowUpDown icon)
-3. Settings (Settings icon)
-
-**Active State:**
-- Green background when active
-- Grey background when inactive
-- Icon + label for clarity
-
-**Positioning:**
-- Fixed bottom with safe area insets
-- z-index: 50 (above most content)
-- pointer-events: auto (always tappable)
-
-### Car ID Formatter
-
-**File:** `src/lib/carIdFormatter.ts`
-
-**Format:** MARK 123456 (uppercase prefix + space + digits)
-
-**Rules:**
-1. Extract all letters → Uppercase prefix
-2. Extract all digits → Number
-3. Join with single space
-4. Handle edge cases (no letters, no digits, empty)
-
-**Examples:**
-- "t box 663 566" → "TBOX 663566"
-- "tbox663566" → "TBOX 663566"
-- "TBOX-663-566" → "TBOX 663566"
-- "abc123def456" → "ABCDEF 123456"
-
-**Global Usage:**
-- All car number inputs
-- All car number displays
-- Search matching
-- Duplicate detection
-- Import normalization
-
----
-
-## PAGE-BY-PAGE BREAKDOWN
-
-### Landing Page (`/`)
-
-**Purpose:** Crew authentication and session initialization
-
-**Features:**
-- Name + Crew ID input fields
-- Profile history dropdowns
-- Last used timestamp display
-- Session validation on mount
-- Auto-navigation if session valid
-
-**Shift Calculation:**
-```typescript
-computeNextShiftChange(shiftA, shiftB):
-  1. Parse shift times (HH:MM format)
-  2. Create Date objects for today
-  3. Find next upcoming shift
-  4. If all shifts passed, use first shift tomorrow
-  5. Return ISO timestamp
-```
-
-**Profile Management:**
-- Auto-suggests from history
-- Shows unique names and crew IDs in dropdowns
-- Updates last used timestamp on login
-- Keeps 10 most recent profiles
-
-**Navigation:**
-- Valid session → /tracks (automatic)
-- New login → Save session → /tracks
-- Settings link at bottom
-
-### Track List (`/tracks`)
-
-**Purpose:** Overview of all tracks with search capability
-
-**Display Sections:**
-
-**Header:**
-- Title: "Morning Yard Check"
-- Current date
-- Crew badge (tap to edit)
-
-**Search Bar:**
-- Placeholder: "Search tracks or cars…"
-- Icon: Search (lucide)
-- Filters tracks + cars in real-time
-
-**Results:**
-
-Default View (no search):
-- All enabled tracks
-- Progress: X / Y
-- Last checked timestamp
-- Status icon (complete/progress/pending)
-
-Search Results:
-- Section: "Matching Cars (N)"
-- Section: "Matching Tracks (N)"
-- Order: Cars first if query has digits
-- Empty state: "No tracks or cars found"
-
-**Track Card:**
-```
-AS28                           [Icon]
-Cars: 12 / 15
-Last checked 2h ago
-```
-
-**Car Card:**
-```
-[Icon] TBOX 663566
-       On: AS28
-       BOX • Confirmed
-```
-
-**Bottom Navigation:** Always visible
-
-### Track Detail (`/track/[id]`)
-
-**Purpose:** View and manage cars on a specific track
-
-**Header:**
-- Back button
-- Track name (large)
-- Reorder button
-
-**Progress Box:**
-- Shows: X / Y (confirmed / total)
-- Pending changes indicator
-
-**Shift Status Legend:**
-```
-[✅] Checked this shift  [⭕] Not checked  [⚠️] Missing
-```
-
-**Filters:**
-- "Not checked only" toggle
-- "Select" mode toggle
-
-**Car List:**
-
-Each car card shows:
-- Shift status icon (left)
-- Checkbox icon (middle)
-- Car number (large, bold, monospace)
-- Car type
-- Confirmation details (if confirmed)
-- Row menu (⋮) when not in select mode
-
-**Bottom Actions:**
-
-Normal Mode:
-- Back | Import | Add + | Done
-
-Selection Mode:
-- Cancel | Move (N) | Delete (N)
-
-**Modals:**
-- Add Car Modal
-- Unconfirm Confirmation Dialog
-- Car Action Menu (Move, Remove)
-- Move Track Picker
-- Remove Confirmation Dialog
-- Batch Move Modal
-- Batch Delete Confirmation
-- Discard Changes Dialog
-- Move Toast Notifications
-
-### Import Page (`/track/[id]/import`)
-
-**Purpose:** Bulk import cars from CN paste data
-
-**Layout:**
-
-**Header:**
-- Back button
-- Title: "Import Cars"
-- Track badge
-
-**Instructions:**
-"Paste the CN car list below. We'll extract car IDs and add only new cars."
-
-**Input:**
-- Large textarea (min 48px height)
-- Placeholder with example format
-- Monospace font
-
-**Actions:**
-- Preview Import (blue)
-- Clear (grey)
-
-**Preview Sections:**
-
-1. Will Add (green)
-   - Shows new cars to be added
-   - Tap to expand source line
-   - Normalized format displayed
-
-2. Skipped - Already on list (yellow)
-   - Shows duplicate car numbers
-   - Track location displayed
-
-3. Unrecognized Lines (red)
-   - Shows lines that didn't match pattern
-   - Truncated if too long
-
-**Bottom Actions:**
-- Back to Edit
-- Add Cars (green, disabled if none to add)
-
-**Success Toast:**
-"Added N cars to TRACK"
-
-### Reorder Page (`/reorder/[id]`)
-
-**Purpose:** Reorder cars on a track
-
-**Layout:**
-
-**Header:**
-- Back button
-- Title: "Reorder Cars"
-- Track badge
-
-**Split View:**
-
-Left Panel: "Current order"
-- Shows remaining cars
-- Tap to move to right panel
-- Hint: "Tap to add →"
-- Position indicator (#1, #2, etc.)
-
-Right Panel: "New order"
-- Shows reordered sequence
-- X button to remove back to left
-- Position indicator
-- Empty state: "Tap cars to build new order"
-
-**Bottom Actions:**
-- Reset (restore original)
-- Cancel (discard changes)
-- Confirm order (save, disabled if empty)
-
-**Workflow:**
-1. Tap cars in left to build new order
-2. Tap X in right to undo
-3. Confirm when satisfied
-4. Navigates back to track detail
-
-### Settings Page (`/settings`)
-
-**Purpose:** Configure app behavior and manage data
-
-**Sections:**
-
-**1. Branding**
-- App Name input
-- Site Name input
-- Save Branding button
-
-**2. Confirmations**
-- "Require confirmation to unconfirm" toggle
-- Help text explaining behavior
-
-**3. Reconciliation**
-- "Resolve unconfirmed cars when Done is tapped" toggle
-- "Show missing cars in track list" toggle
-- "Move placement" radio (append/prepend)
-
-**4. Shift Changes**
-- Shift A Time input (time picker)
-- Shift B Time input (time picker)
-- Save Shift Times button
-- Explanation text
-
-**5. Tracks (Admin)**
-- "Admin: Manage Tracks" toggle to enable
-- When enabled:
-  - List all tracks with enable/disable toggles
-  - Add Track input (validates AS## format)
-  - Save Changes button
-
-**6. Diagnostics**
-- View Debug Logs button
-- Clear Debug Logs button
-
-**7. Data Management**
-- Clear Local Data button
-- Warning about irreversibility
-- Confirmation dialog
-
-**Debug Logs Modal:**
-- Last 20 logs displayed
-- Formatted with:
-  - Action name (green)
-  - Timestamp
-  - Track name
-  - Car counts
-  - Pending changes
-- Copy to Clipboard button
-- Close button
-
-**Clear Data Confirmation:**
-- Title: "Clear all local data?"
-- Warning text
-- Cancel | Yes, Clear buttons
-- Redirects to landing page after clear
-
----
-
-## STYLING & DESIGN SYSTEM
-
-### Color Palette
-
-**Background:**
-- Primary: zinc-900
-- Secondary: zinc-800
-- Tertiary: zinc-700
-
-**Text:**
-- Primary: white
-- Secondary: zinc-400
-- Tertiary: zinc-500
-
-**Status Colors:**
-- Success: green-500, green-600
-- Warning: yellow-500, yellow-600
-- Error: red-500, red-600
-- Info: blue-500, blue-600
-
-**Interactive:**
-- Hover: zinc-700
-- Active: green-600
-- Disabled: zinc-700 (text: zinc-500)
-
-### Typography
-
-**Font Families:**
-- Default: System sans-serif
-- Monospace: For car numbers, crew IDs
-
-**Sizes:**
-- Hero: text-3xl, text-4xl (track names)
-- Large: text-2xl, text-3xl (car numbers)
-- Base: text-lg, text-xl (body)
-- Small: text-sm, text-base (secondary info)
-- Tiny: text-xs (timestamps, hints)
-
-**Weights:**
-- Bold: font-bold (track names, car numbers)
-- Semibold: font-semibold (labels)
-- Medium: font-medium (buttons)
-- Normal: Default for body text
-
-### Spacing
-
-**Component Padding:**
-- Large: p-5, p-6 (cards, modals)
-- Medium: p-4 (inputs, buttons)
-- Small: p-3 (compact elements)
-
-**Component Gaps:**
-- Large: gap-4, gap-6 (sections)
-- Medium: gap-3 (card lists)
-- Small: gap-2 (inline elements)
-
-**Margin:**
-- Section: mb-6, mb-8
-- Element: mb-2, mb-3, mb-4
-
-### Touch Targets
-
-**Minimum Size:** 44px (WCAG AAA)
-
-**Button Heights:**
-- Primary action: py-4, py-5 (56px+)
-- Secondary action: py-3, py-4 (48px+)
-- Icon button: p-3 (44px+)
-
-**Interactive Areas:**
-- Car cards: p-5, p-6 (full card tappable)
-- Track cards: p-5, p-6
-- List items: py-4 minimum
-
-### Iconography
-
-**Library:** lucide-react v0.474.0
-
-**Sizes:**
-- Large: w-8 h-8 (track status)
-- Medium: w-6 h-6 (navigation, car status)
-- Small: w-5 h-5 (inline icons)
-
-**Common Icons:**
-- CheckCircle2: Confirmed
-- Circle: Pending
-- AlertTriangle: Missing/Warning
-- BadgeCheck: Checked this shift
-- CircleDashed: Not checked
-- ArrowLeft: Back navigation
-- ArrowRight: Forward action
-- Plus: Add action
-- Upload: Import action
-- ArrowUpDown: Reorder action
-- MoreVertical: Row menu
-- Trash2: Delete action
-- Search: Search input
-- Settings: Settings tab
-- ClipboardList: Yard check tab
-
-### Responsive Design
-
-**Breakpoints:**
-- Mobile: default (< 640px)
-- Tablet: md: (640px - 768px)
-- Desktop: lg: (> 768px)
-
-**Max Width:** 4xl (896px) for content containers
-
-**Responsive Patterns:**
-- Font sizes: text-base md:text-lg
-- Icon sizes: w-6 md:w-7
-- Spacing: gap-3 md:gap-4
-- Grid columns: grid-cols-1 md:grid-cols-2
-
-### Accessibility
-
-**Contrast Ratios:**
-- Text on zinc-900: white (21:1)
-- Secondary text: zinc-400 (9:1)
-- Disabled text: zinc-500 (6:1)
-
-**Focus States:**
-- Border: border-green-500
-- Ring: ring-2 ring-green-500
-- Outline: focus:outline-none
-
-**ARIA Labels:**
-- Icon buttons: aria-label
-- Navigation tabs: aria-label
-- Status indicators: aria-label
-
-**Keyboard Navigation:**
-- Tab order: logical flow
-- Focus visible: high contrast borders
-- Skip links: Not implemented (consider adding)
-
----
-
-## CONFIGURATION FILES
-
-### package.json
-
-```json
-{
-  "name": "tracking-sheet",
-  "version": "2.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@radix-ui/react-accordion": "^1.2.2",
-    "@radix-ui/react-alert-dialog": "^1.1.4",
-    "@radix-ui/react-aspect-ratio": "^1.1.1",
-    "@radix-ui/react-avatar": "^1.1.2",
-    "@radix-ui/react-checkbox": "^1.1.3",
-    "@radix-ui/react-collapsible": "^1.1.2",
-    "@radix-ui/react-context-menu": "^2.2.4",
-    "@radix-ui/react-dialog": "^1.1.4",
-    "@radix-ui/react-dropdown-menu": "^2.1.4",
-    "@radix-ui/react-hover-card": "^1.1.4",
-    "@radix-ui/react-label": "^2.1.1",
-    "@radix-ui/react-menubar": "^1.1.4",
-    "@radix-ui/react-navigation-menu": "^1.2.3",
-    "@radix-ui/react-popover": "^1.1.4",
-    "@radix-ui/react-progress": "^1.1.1",
-    "@radix-ui/react-radio-group": "^1.2.2",
-    "@radix-ui/react-scroll-area": "^1.2.2",
-    "@radix-ui/react-select": "^2.1.4",
-    "@radix-ui/react-separator": "^1.1.1",
-    "@radix-ui/react-slider": "^1.2.2",
-    "@radix-ui/react-slot": "^1.1.1",
-    "@radix-ui/react-switch": "^1.1.2",
-    "@radix-ui/react-tabs": "^1.1.2",
-    "@radix-ui/react-toast": "^1.2.4",
-    "@radix-ui/react-toggle": "^1.1.1",
-    "@radix-ui/react-toggle-group": "^1.1.1",
-    "@radix-ui/react-tooltip": "^1.1.6",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "embla-carousel-react": "^8.5.1",
-    "input-otp": "^1.4.1",
-    "lucide-react": "^0.474.0",
-    "next": "15.2.0",
-    "next-themes": "^0.4.4",
-    "react": "^18.3.1",
-    "react-day-picker": "^8.10.1",
-    "react-dom": "^18.3.1",
-    "react-resizable-panels": "^2.1.7",
-    "recharts": "^2.15.0",
-    "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7",
-    "vaul": "^1.1.2"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "eslint": "^9",
-    "eslint-config-next": "15.2.0",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  }
-}
-```
-
-### tsconfig.json
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-}
-```
-
-### tailwind.config.ts
-
-```typescript
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-  darkMode: ["class"],
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-    },
-  },
-  plugins: [require("tailwindcss-animate")],
-};
-
-export default config;
-```
-
-### next.config.mjs
-
-```javascript
-const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
-};
-
-export default nextConfig;
-```
-
----
-
-## TESTING GUIDE
-
-### Core User Flows
-
-**1. Morning Yard Check Workflow**
-```
-Landing → Enter credentials → Track List
-→ Search "AS28" → Tap AS28
-→ Tap cars to confirm → Done
-→ Check shift status icons → All green
-```
-
-**2. Add Car Workflow**
-```
-Track Detail → Tap Add +
-→ Enter "TBOX 663566"
-→ Select "BOX" type
-→ Tap Add Car
-→ Car appears in list
-→ Shift icon shows CircleDashed
-```
-
-**3. Import Cars Workflow**
-```
-Track Detail → Tap Import
-→ Paste CN list
-→ Tap Preview Import
-→ Review sections
-→ Tap car to see source
-→ Tap Add Cars
-→ Success toast → Returns to track
-```
-
-**4. Search Workflow**
-```
-Track List → Enter "TBOX"
-→ See matching cars with track locations
-→ Tap car → Opens track detail
-→ Car is visible in list
-```
-
-**5. Reorder Workflow**
-```
-Track List → Bottom Nav → Reorder
-→ Select track
-→ Tap cars in left panel
-→ Build order in right panel
-→ Tap Confirm
-→ Returns to track detail
-```
-
-**6. Multi-Select Workflow**
-```
-Track Detail → Tap Select
-→ Tap multiple cars
-→ Tap Move (N)
-→ Select destination track
-→ Cars moved
-→ Success toast
-```
-
-### Mobile Testing
-
-**iOS Safari:**
-- Safe area insets working
-- Bottom nav not covered by system UI
-- Touch targets responsive
-- Text inputs don't zoom (font-size: 16px)
-
-**Android Chrome:**
-- Touch targets responsive
-- Back button navigation
-- Keyboard behavior
-- Safe area handling
-
-**Glove Testing:**
-- All buttons tappable with gloves
-- No accidental taps
-- Clear visual feedback
-- Sufficient spacing between targets
-
-**Orientation:**
-- Portrait: Primary layout
-- Landscape: Optional support
-
-### Data Integrity Testing
-
-**Duplicate Detection:**
-```
-Add car "TBOX 663566" to AS28
-Try to add "TBOX 663566" to AS29
-→ Blocked (duplicate detected)
-Try to import "TBOX 663566" to AS28
-→ Skipped (already on list)
-```
-
-**Car ID Normalization:**
-```
-Enter "t box 663 566" → Saves as "TBOX 663566"
-Enter "tbox663566" → Saves as "TBOX 663566"
-Enter "TBOX-663-566" → Saves as "TBOX 663566"
-Search "tbox" → Finds "TBOX 663566"
-```
-
-**Session Expiration:**
-```
-Login at 05:30 (before Shift A at 06:00)
-→ Session expires at 06:00
-Return at 06:01
-→ Redirects to landing page
-```
-
-**Data Repair:**
-```
-Manually corrupt localStorage (missing car IDs)
-Refresh page
-→ Console shows repair actions
-→ All cars have unique IDs
-→ No functionality broken
-```
-
-### Performance Testing
-
-**Large Track Load:**
-```
-Add 100 cars to a track
-Open track detail
-→ Should load within 1 second
-Scroll through list
-→ Smooth scrolling
-Search for car
-→ Instant results
-```
-
-**Import Performance:**
-```
-Paste 200-line CN list
-Tap Preview Import
-→ Results within 2 seconds
-Tap Add Cars
-→ Completes within 3 seconds
-```
-
-### Browser Compatibility
-
-**Supported:**
-- Chrome 90+
-- Safari 14+
-- Firefox 88+
-- Edge 90+
-
-**Features:**
-- CSS Grid: Full support
-- Flexbox: Full support
-- CSS Custom Properties: Full support
-- localStorage: Full support
-- crypto.randomUUID: Fallback provided
-
----
-
-## DEPLOYMENT
-
-### Vercel (Recommended)
-
-**One-Click Deploy:**
 ```bash
-npm i -g vercel
-vercel
-```
-
-**Environment:**
-- Node.js: 18.x or 20.x
-- Build Command: npm run build
-- Output Directory: .next
-- Install Command: npm install
-
-**Domain Setup:**
-- Custom domain supported
-- Automatic HTTPS
-- Edge network
-
-### Manual Deployment
-
-**Build:**
-```bash
-npm install
+# Production build
 npm run build
-```
 
-**Start:**
-```bash
+# Start server
 npm start
+
+# Or use PM2 for process management
+npm install -g pm2
+pm2 start npm --name "rail-yard-tracker" -- start
+pm2 save
+pm2 startup
 ```
 
-**Environment:**
-- PORT: 3000 (default)
-- NODE_ENV: production
+### Option 2: Desktop App (Electron)
 
-### Docker (Optional)
+```bash
+# Install Electron
+npm install --save-dev electron electron-builder
 
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --production
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "start"]
+# Add scripts to package.json:
+"electron": "electron .",
+"electron:build": "electron-builder"
+
+# Build desktop app
+npm run electron:build
+```
+
+### Option 3: Cloud Server
+
+```bash
+# Deploy to any Node.js hosting:
+- Vercel (recommended for Next.js)
+- Railway
+- Render
+- DigitalOcean
+- AWS/Azure/GCP
+
+# Build command: npm run build
+# Start command: npm start
+# Port: 3000 (or PORT env var)
 ```
 
 ---
 
-## KNOWN LIMITATIONS
+## 📦 Dependencies
 
-### Technical Constraints
+### Core Framework
+```json
+"next": "^15.2.0",
+"react": "^18.3.0",
+"react-dom": "^18.3.0",
+"typescript": "^5.0.0"
+```
 
-1. **No Backend:** All data stored in localStorage (client-side only)
-2. **No Sync:** No multi-device or crew synchronization
-3. **No Real Auth:** Simple name + crew ID (no passwords or security)
-4. **No Offline Indicator:** Assumes always online (though works offline)
-5. **No Export:** Can't export history to CSV or external format
-6. **Browser Storage Limits:** localStorage typically 5-10MB per domain
-7. **No Photo Capture:** No camera integration for car photos
-8. **No GPS:** No location tracking or geofencing
+### UI & Styling
+```json
+"tailwindcss": "^3.4.0",
+"@radix-ui/react-*": "Various versions",
+"lucide-react": "^0.474.0",
+"class-variance-authority": "^0.7.1",
+"clsx": "^2.1.1",
+"tailwind-merge": "^2.6.0"
+```
 
-### UX Limitations
+### Forms & Validation
+```json
+"react-hook-form": "^7.54.2",
+"zod": "^3.24.1",
+"@hookform/resolvers": "^3.9.1"
+```
 
-1. **Single User:** No concurrent multi-user editing
-2. **No Undo:** Actions are immediate (except discard changes dialog)
-3. **No Notifications:** No reminders or alerts
-4. **No Dark/Light Toggle:** Fixed dark theme
-5. **Limited History:** Only diagnostic logs, no full audit trail
-6. **No Analytics:** No usage statistics or insights
+### Animation
+```json
+"framer-motion": "^11.15.0"
+```
 
-### Data Limitations
-
-1. **No Backup:** Data only exists in browser localStorage
-2. **No Versioning:** No track back to previous states (except basic revert)
-3. **No Comments:** No notes or annotations on cars or tracks
-4. **No Custom Fields:** Fixed car data structure
-5. **No Relationships:** Cars independent, no coupling or consists
-
-### Future Enhancements (Not Implemented)
-
-1. Backend Integration (Supabase/Firebase)
-2. Real-time Sync Across Devices
-3. Photo Attachments for Cars
-4. QR Code Scanning
-5. CSV Export/Import
-6. Advanced Reporting
-7. Role-Based Access Control
-8. Push Notifications
-9. GPS Location Tracking
-10. Offline Sync Queue
+### Utilities
+```json
+"date-fns": "^4.1.0",
+"react-signature-canvas": "^1.0.6"
+```
 
 ---
 
-## TROUBLESHOOTING
+## 🔄 Update Process
 
-### Common Issues
+### Check for Updates
 
-**Issue: Cars not appearing after import**
-- Check browser console for errors
-- Verify CN list format (2-4 letters + 3-7 digits)
-- Check for duplicates in skipped section
-- Run check_for_errors to validate state
+```bash
+# Check for outdated packages
+npm outdated
 
-**Issue: Session expires too quickly**
-- Check shift times in Settings
-- Verify next shift calculation logic
-- Check localStorage for SESSION_EXPIRES_AT value
+# Update all packages to latest
+npm update
 
-**Issue: Duplicate car IDs**
-- Data repair runs on load
-- Check console for repair messages
-- View Debug Logs in Settings
-- Clear local data if persistent
-
-**Issue: Bottom nav not visible**
-- Check z-index (should be 50)
-- Verify pointer-events: auto
-- Check safe area insets
-- Test on actual device (not just browser)
-
-**Issue: Search not finding cars**
-- Verify car number normalization
-- Check search query formatting
-- Ensure track is enabled
-- Try exact car number
-
-### Diagnostic Tools
-
-**View Debug Logs:**
-```
-Settings → View Debug Logs
-→ Shows last 20 operations
-→ Copy to Clipboard for sharing
+# Or update specific package
+npm install package-name@latest
 ```
 
-**Check localStorage:**
-```javascript
-localStorage.getItem("rail_yard_tracks")
-localStorage.getItem("rail_yard_debug_logs")
-localStorage.getItem("rail_yard_move_logs")
+### After Updates
+
 ```
-
-**Console Commands:**
-```javascript
-JSON.parse(localStorage.getItem("rail_yard_tracks"))
-Object.keys(localStorage).filter(k => k.startsWith("rail_yard"))
+1. Run health check: Settings → System Health
+2. Verify all 15 checks pass
+3. Test multi-device sync
+4. Test inspection workflow
+5. Export health report for records
 ```
-
-**Clear Data:**
-```
-Settings → Data Management → Clear Local Data
-→ Confirmation dialog
-→ Redirects to landing page
-```
-
-### Support Resources
-
-**Code Reference:**
-- This export document
-- Inline code comments
-- Type definitions in src/types/index.ts
-
-**Debugging:**
-- Browser DevTools Console
-- Network tab (should be empty except initial load)
-- Application tab → localStorage
-
-**Community:**
-- GitHub Issues (if applicable)
-- Project documentation
-- Team communication channels
 
 ---
 
-## VERSION HISTORY
+## 🆘 Troubleshooting
 
-### v2.0.0 (2025-12-16)
-- Added shift status icon system
-- Enhanced search with car ID matching
-- Added multi-select mode for batch operations
-- Improved filter logic for "Unconfirmed only"
-- Added shift status legend
-- Updated PROJECT_EXPORT.md
+### Server Won't Start
 
-### v1.0.0 (2025-12-16)
-- Initial release
-- Track management system
-- Car add/confirm/unconfirm
-- Bulk import functionality
-- Car reorder system
-- Crew session management
-- Profile history
-- Diagnostic logging
-- Settings customization
-- Data repair system
+```
+Error: Port 3000 already in use
+
+Solution:
+1. Find process using port 3000:
+   Windows: netstat -ano | findstr :3000
+   Mac/Linux: lsof -i :3000
+   
+2. Kill the process or use different port:
+   PORT=3001 npm start
+```
+
+### Mobile Can't Connect
+
+```
+Error: Cannot reach server
+
+Solutions:
+1. Ensure mobile on same WiFi as desktop
+2. Check desktop firewall settings
+3. Verify server is running
+4. Test connection: Settings → Network & Server → Test
+5. Try using IP instead of hostname
+```
+
+### Sync Not Working
+
+```
+Error: Sync stuck or failing
+
+Solutions:
+1. Check network connection
+2. Run health check: Settings → System Health
+3. Manual sync: Settings → Network & Server → Sync Now
+4. Check server logs for errors
+5. Restart server if needed
+```
+
+### Data Not Persisting
+
+```
+Error: Changes don't save
+
+Solutions:
+1. Check localStorage availability
+2. Run health check: Settings → System Health
+3. Verify storage configuration: Settings → Backend
+4. Check browser console for errors
+5. Clear cache and reload
+```
+
+### Health Check Failures
+
+```
+Error: System health checks failing
+
+Solutions:
+1. Review detailed error messages
+2. Fix reported issues one by one
+3. Re-run health check after each fix
+4. Export report for documentation
+5. Contact support if persistent
+```
 
 ---
 
-## CREDITS
+## 📞 Support
 
-**Framework:** Next.js 15.2
-**UI Library:** shadcn/ui
-**Icons:** lucide-react
-**Styling:** Tailwind CSS 3.4
-**Language:** TypeScript 5
+### Documentation
 
-**Design Principles:**
-- Mobile-first responsive design
-- Glove-friendly touch targets
-- High contrast dark theme
-- One-handed operation
-- Minimal cognitive load
+- Full documentation: This README file
+- API Reference: See "API Reference" section above
+- Configuration Guide: See "Configuration Files" section
 
-**Inspiration:**
-- Industrial UI design
-- Railway operations workflows
-- Cold-weather usability requirements
-- Real-world yard crew feedback
+### Community
+
+- GitHub Issues: [Report bugs or request features]
+- Discussions: [Ask questions and share ideas]
+
+### Professional Support
+
+For enterprise support, custom features, or deployment assistance:
+- Email: support@softgen.ai
+- Priority support available for business licenses
 
 ---
 
-**END OF EXPORT**
+## 📄 License
 
-Generated: 2025-12-16 21:20:00 UTC
-Total Files: 50+ source files
-Total Lines: 10,000+ lines of code
-Document Version: 2.0.0
+Copyright © 2026 Rail Yard Tracker
+
+All rights reserved. This software is proprietary.
+
+---
+
+## 🎉 Thank You!
+
+Thank you for using Rail Yard Tracker. We hope this system makes your rail yard inspection process more efficient and reliable.
+
+**Key Features Summary:**
+✅ Multi-device sync (Desktop + Mobile)
+✅ Role-based access control
+✅ Offline-capable inspection forms
+✅ Automated health monitoring
+✅ QR code easy setup
+✅ Bug fixes for signature/navigation
+
+**Version:** 2.0.0  
+**Last Updated:** March 13, 2026  
+**Built with:** Next.js, TypeScript, Tailwind CSS
+
+---
+
+## 🚀 Quick Reference Commands
+
+```bash
+# Development
+npm run dev          # Start development server
+
+# Production
+npm run build        # Build for production
+npm start            # Start production server
+
+# Maintenance
+npm run lint         # Check code quality
+npm run type-check   # TypeScript validation
+
+# Process Management (PM2)
+pm2 start npm --name rail-yard -- start
+pm2 stop rail-yard
+pm2 restart rail-yard
+pm2 logs rail-yard
+pm2 monit
+```
+
+---
+
+**Ready to Deploy!** Follow the "Quick Start" section above to get started.
