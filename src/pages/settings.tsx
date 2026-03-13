@@ -13,7 +13,8 @@ import {
   Calendar, 
   Database, 
   Mail,
-  Server
+  Server as ServerIcon,
+  Activity
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
