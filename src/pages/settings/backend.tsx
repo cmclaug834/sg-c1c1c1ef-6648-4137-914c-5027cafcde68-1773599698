@@ -162,7 +162,7 @@ export default function BackendSettings() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-zinc-950 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-zinc-950 text-white pb-safe-bottom-nav">
       {/* Quick Setup Modal */}
       {showQuickSetup && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
@@ -421,7 +421,7 @@ export default function BackendSettings() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-safe-bottom-nav">
 
         {/* Quick Setup Re-run Button */}
         {setupCompatibility?.canRun && (

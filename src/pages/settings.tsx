@@ -14,7 +14,10 @@ import {
   Database, 
   Mail,
   Server as ServerIcon,
-  Activity
+  Activity,
+  Wrench,
+  Network,
+  Shield
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
@@ -237,7 +240,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
+    <div className="min-h-screen bg-zinc-900 text-white pb-safe-bottom-nav">
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-8">
           {currentUser && (
@@ -249,38 +252,118 @@ export default function Settings() {
               <ArrowLeft className="w-7 h-7" />
             </button>
           )}
-          {/* D.headerTitle */}
-          <h1 id="D.headerTitle" className="text-3xl font-bold tracking-tight">
-            Settings
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <div className="w-14" />
         </div>
 
-        {/* D.sectionYardSetup - NEW SECTION */}
-        <div id="D.sectionYardSetup" className="mb-8">
-          <h2 className="text-2xl font-bold mb-6">Yard Setup</h2>
+        {/* ADVANCED SETTINGS - Navigational Cards */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-6">Advanced Settings</h2>
+          
+          <div className="space-y-3">
+            {/* Manage Tracks */}
+            <button
+              onClick={() => router.push("/settings/manage-tracks")}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-600/10 rounded-lg group-hover:bg-blue-600/20 transition-colors">
+                  <MapPin className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-medium mb-1">Manage Tracks</div>
+                  <p className="text-sm text-zinc-500">
+                    Rename track display names, add or disable tracks
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-400" />
+            </button>
 
-          <button
-            onClick={() => router.push("/settings/manage-tracks")}
-            className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between"
-          >
-            <div>
-              <div className="text-lg font-medium mb-1">Manage Tracks</div>
-              <p className="text-sm text-zinc-500">
-                Rename track display names, add or disable tracks
-              </p>
-            </div>
-            <ArrowLeft className="w-5 h-5 text-zinc-400 rotate-180" />
-          </button>
+            {/* Backend & System */}
+            <button
+              onClick={() => router.push("/settings/backend")}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-600/10 rounded-lg group-hover:bg-purple-600/20 transition-colors">
+                  <Database className="w-6 h-6 text-purple-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-medium mb-1">Backend & System</div>
+                  <p className="text-sm text-zinc-500">
+                    Configure backend services, database, and storage
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-400" />
+            </button>
+
+            {/* Network & Server */}
+            <button
+              onClick={() => router.push("/settings/network-server")}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-600/10 rounded-lg group-hover:bg-green-600/20 transition-colors">
+                  <Network className="w-6 h-6 text-green-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-medium mb-1">Network & Server</div>
+                  <p className="text-sm text-zinc-500">
+                    Multi-device sync, user management, server settings
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-400" />
+            </button>
+
+            {/* System Health */}
+            <button
+              onClick={() => router.push("/settings/system-health")}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-red-600/10 rounded-lg group-hover:bg-red-600/20 transition-colors">
+                  <Activity className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-medium mb-1">System Health & Stability</div>
+                  <p className="text-sm text-zinc-500">
+                    Diagnostics, health checks, performance monitoring
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-400" />
+            </button>
+
+            {/* CN Rail API */}
+            <button
+              onClick={() => router.push("/settings/cn-rail-api")}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-600/10 rounded-lg group-hover:bg-orange-600/20 transition-colors">
+                  <Wrench className="w-6 h-6 text-orange-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-medium mb-1">CN Rail API Integration</div>
+                  <p className="text-sm text-zinc-500">
+                    Configure CN Rail API, car import, and data sync
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-400" />
+            </button>
+          </div>
         </div>
 
-        {/* D.sectionCrew - NEW SECTION */}
-        <div id="D.sectionCrew" className="mt-8">
+        {/* Crew Information */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Crew Information</h2>
 
           <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
-            {/* D.crewNameField */}
-            <div id="D.crewNameField">
+            <div>
               <label className="block text-zinc-400 mb-2 text-base">Crew Name</label>
               <input
                 type="text"
@@ -294,8 +377,7 @@ export default function Settings() {
               />
             </div>
 
-            {/* D.crewIdField */}
-            <div id="D.crewIdField">
+            <div>
               <label className="block text-zinc-400 mb-2 text-base">Crew ID</label>
               <input
                 type="text"
@@ -309,18 +391,15 @@ export default function Settings() {
               />
             </div>
 
-            {/* D.crewValidationText */}
             {crewValidation && (
-              <p id="D.crewValidationText" className={`text-sm ${
+              <p className={`text-sm ${
                 crewValidation.includes("successfully") ? "text-green-500" : "text-yellow-500"
               }`}>
                 {crewValidation}
               </p>
             )}
 
-            {/* D.saveCrewBtn */}
             <button
-              id="D.saveCrewBtn"
               onClick={handleSaveCrew}
               className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
             >
@@ -329,13 +408,12 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* D.sectionBranding - NEW SECTION */}
-        <div id="D.sectionBranding" className="mt-8">
+        {/* Branding */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Branding</h2>
 
           <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
-            {/* D.appNameField */}
-            <div id="D.appNameField">
+            <div>
               <label className="block text-zinc-400 mb-2 text-base">App Name</label>
               <input
                 type="text"
@@ -346,8 +424,7 @@ export default function Settings() {
               />
             </div>
 
-            {/* D.siteNameField */}
-            <div id="D.siteNameField">
+            <div>
               <label className="block text-zinc-400 mb-2 text-base">Site Name</label>
               <input
                 type="text"
@@ -358,9 +435,7 @@ export default function Settings() {
               />
             </div>
 
-            {/* D.saveBrandingBtn */}
             <button
-              id="D.saveBrandingBtn"
               onClick={handleSaveBranding}
               className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
             >
@@ -369,13 +444,11 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* D.sectionConfirmations */}
-        <div id="D.sectionConfirmations" className="mt-12 pt-8 border-t border-zinc-800">
+        {/* Confirmations */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Confirmations</h2>
 
-          {/* D.unconfirmDialogToggle */}
           <button
-            id="D.unconfirmDialogToggle"
             onClick={handleToggleDialog}
             className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
           >
@@ -390,21 +463,18 @@ export default function Settings() {
               </div>
             </div>
             
-            {/* D.unconfirmHelpText */}
-            <p id="D.unconfirmHelpText" className="text-sm text-zinc-500">
+            <p className="text-sm text-zinc-500">
               When enabled, you'll be asked to confirm before unmarking a car as unconfirmed
             </p>
           </button>
         </div>
 
-        {/* D.sectionReconciliation */}
-        <div id="D.sectionReconciliation" className="mt-12 pt-8 border-t border-zinc-800">
+        {/* Reconciliation */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Reconciliation</h2>
 
           <div className="space-y-4">
-            {/* D.resolveOnDoneToggle */}
             <button
-              id="D.resolveOnDoneToggle"
               onClick={handleToggleResolveOnDone}
               className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
             >
@@ -419,15 +489,12 @@ export default function Settings() {
                 </div>
               </div>
               
-              {/* D.resolveHelpText */}
-              <p id="D.resolveHelpText" className="text-sm text-zinc-500">
+              <p className="text-sm text-zinc-500">
                 Automatically marks remaining unconfirmed cars as resolved when you finish checking a track
               </p>
             </button>
 
-            {/* D.showMissingInListToggle */}
             <button
-              id="D.showMissingInListToggle"
               onClick={handleToggleShowMissing}
               className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors"
             >
@@ -442,19 +509,16 @@ export default function Settings() {
                 </div>
               </div>
               
-              {/* D.missingHelpText */}
-              <p id="D.missingHelpText" className="text-sm text-zinc-500">
+              <p className="text-sm text-zinc-500">
                 Display cars that weren't confirmed during the check in the track overview
               </p>
             </button>
 
-            {/* D.movePlacementOption */}
-            <div id="D.movePlacementOption" className="bg-zinc-800 p-5 rounded-xl">
+            <div className="bg-zinc-800 p-5 rounded-xl">
               <div className="mb-4">
                 <span className="text-lg font-medium block mb-2">When moving cars to another track:</span>
                 
-                {/* D.movePlacementHelpText */}
-                <p id="D.movePlacementHelpText" className="text-sm text-zinc-500">
+                <p className="text-sm text-zinc-500">
                   Choose where moved cars appear in the destination track's list
                 </p>
               </div>
@@ -487,8 +551,8 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* D.sectionShift - NEW SECTION */}
-        <div id="D.sectionShift" className="mt-12 pt-8 border-t border-zinc-800">
+        {/* Shift Changes */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Shift Changes</h2>
 
           <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
@@ -496,8 +560,7 @@ export default function Settings() {
               Set the times when crew sessions expire and require re-confirmation at the landing page.
             </p>
 
-            {/* D.shiftAField */}
-            <div id="D.shiftAField">
+            <div>
               <label className="block text-zinc-400 mb-2 text-base">Shift A Time</label>
               <input
                 type="time"
@@ -507,8 +570,7 @@ export default function Settings() {
               />
             </div>
 
-            {/* D.shiftBField */}
-            <div id="D.shiftBField">
+            <div>
               <label className="block text-zinc-400 mb-2 text-base">Shift B Time</label>
               <input
                 type="time"
@@ -518,9 +580,7 @@ export default function Settings() {
               />
             </div>
 
-            {/* D.saveShiftTimesBtn */}
             <button
-              id="D.saveShiftTimesBtn"
               onClick={handleSaveShiftTimes}
               className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
             >
@@ -529,13 +589,11 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* D.sectionTracks */}
-        <div id="D.sectionTracks" className="mt-12 pt-8 border-t border-zinc-800">
-          <h2 className="text-2xl font-bold mb-6">Tracks</h2>
+        {/* Tracks Management Toggle */}
+        <div className="mt-12 pt-8 border-t border-zinc-800">
+          <h2 className="text-2xl font-bold mb-6">Quick Track Management</h2>
 
-          {/* D.adminManageTracksToggle */}
           <button
-            id="D.adminManageTracksToggle"
             onClick={handleToggleAdminManageTracks}
             className="w-full bg-zinc-800 hover:bg-zinc-700 p-5 rounded-xl text-left transition-colors mb-4"
           >
@@ -555,21 +613,16 @@ export default function Settings() {
             </p>
           </button>
 
-          {/* D.manageTracksPanel */}
           {adminManageTracks && (
-            <div id="D.manageTracksPanel" className="bg-zinc-800 p-5 rounded-xl space-y-4">
-              {/* D.trackManageList */}
-              <div id="D.trackManageList" className="space-y-3">
+            <div className="bg-zinc-800 p-5 rounded-xl space-y-4">
+              <div className="space-y-3">
                 {localTracks.map(track => (
-                  <div key={track.id} className="D.trackManageRow flex items-center justify-between bg-zinc-900 p-4 rounded-lg">
-                    {/* D.trackIdText */}
-                    <span id="D.trackIdText" className="text-lg font-mono font-medium">
+                  <div key={track.id} className="flex items-center justify-between bg-zinc-900 p-4 rounded-lg">
+                    <span className="text-lg font-mono font-medium">
                       {track.name}
                     </span>
 
-                    {/* D.trackEnabledToggle */}
                     <button
-                      id="D.trackEnabledToggle"
                       onClick={() => handleToggleTrack(track.id)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         track.enabled
@@ -586,9 +639,7 @@ export default function Settings() {
               <div className="pt-4 border-t border-zinc-700 space-y-3">
                 <div>
                   <label className="block text-zinc-400 mb-2 text-sm">Add New Track</label>
-                  {/* D.addTrackInput */}
                   <input
-                    id="D.addTrackInput"
                     type="text"
                     value={newTrackInput}
                     onChange={(e) => {
@@ -599,9 +650,8 @@ export default function Settings() {
                     placeholder="AS## (example: AS50)"
                   />
                   
-                  {/* D.trackValidationText */}
                   {trackValidation && (
-                    <p id="D.trackValidationText" className={`mt-2 text-sm ${
+                    <p className={`mt-2 text-sm ${
                       trackValidation.includes("successfully") ? "text-green-500" : "text-yellow-500"
                     }`}>
                       {trackValidation}
@@ -609,18 +659,14 @@ export default function Settings() {
                   )}
                 </div>
 
-                {/* D.addTrackBtn */}
                 <button
-                  id="D.addTrackBtn"
                   onClick={handleAddTrack}
                   className="w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg text-base font-medium transition-colors"
                 >
                   Add Track
                 </button>
 
-                {/* D.saveTrackChangesBtn */}
                 <button
-                  id="D.saveTrackChangesBtn"
                   onClick={handleSaveTrackChanges}
                   className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-base font-medium transition-colors"
                 >
@@ -631,22 +677,18 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Diagnostics Section */}
+        {/* Diagnostics */}
         <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Diagnostics</h2>
 
-          {/* D.viewDebugLogsBtn */}
           <button
-            id="D.viewDebugLogsBtn"
             onClick={handleViewDebugLogs}
             className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
           >
             View Debug Logs
           </button>
 
-          {/* D.clearDebugLogsBtn */}
           <button
-            id="D.clearDebugLogsBtn"
             onClick={handleClearDebugLogs}
             className="w-full mt-3 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
           >
@@ -654,7 +696,7 @@ export default function Settings() {
           </button>
         </div>
 
-        {/* NEW: Data Management Section */}
+        {/* Data Management */}
         <div className="mt-12 pt-8 border-t border-zinc-800">
           <h2 className="text-2xl font-bold mb-6">Data Management</h2>
 
@@ -663,9 +705,7 @@ export default function Settings() {
               Clear all local data stored on this device. This includes tracks, crew profiles, settings, and history.
             </p>
 
-            {/* D.clearLocalDataBtn */}
             <button
-              id="D.clearLocalDataBtn"
               onClick={() => setShowClearDataDialog(true)}
               className="w-full py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
             >
@@ -679,13 +719,9 @@ export default function Settings() {
       {showDebugLogs && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-4xl border border-zinc-800 p-6 my-8 max-h-[90vh] overflow-hidden flex flex-col">
-            {/* D.debugLogsTitle */}
-            <h2 id="D.debugLogsTitle" className="text-2xl font-bold mb-4">
-              Debug Logs (Last 20)
-            </h2>
+            <h2 className="text-2xl font-bold mb-4">Debug Logs (Last 20)</h2>
 
-            {/* D.debugLogsScroll */}
-            <div id="D.debugLogsScroll" className="flex-1 overflow-y-auto mb-6 space-y-4">
+            <div className="flex-1 overflow-y-auto mb-6 space-y-4">
               {debugLogs.length === 0 ? (
                 <p className="text-zinc-500 text-center py-8">No debug logs yet</p>
               ) : (
@@ -739,7 +775,6 @@ export default function Settings() {
               )}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDebugLogs(false)}
@@ -749,7 +784,6 @@ export default function Settings() {
               </button>
 
               <button
-                id="D.copyDebugLogsBtn"
                 onClick={handleCopyDebugLogs}
                 className={`flex-1 py-4 rounded-lg text-lg font-medium transition-colors ${
                   copySuccess
@@ -768,13 +802,9 @@ export default function Settings() {
       {showClearDataDialog && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 p-6">
-            {/* D.clearDataDialogTitle */}
-            <h2 id="D.clearDataDialogTitle" className="text-2xl font-bold mb-4">
-              Clear all local data?
-            </h2>
+            <h2 className="text-2xl font-bold mb-4">Clear all local data?</h2>
 
-            {/* D.clearDataDialogBody */}
-            <p id="D.clearDataDialogBody" className="text-zinc-400 text-lg mb-2">
+            <p className="text-zinc-400 text-lg mb-2">
               This will erase saved tracks, crew profiles, settings, and history from this device.
             </p>
             
@@ -783,18 +813,14 @@ export default function Settings() {
             </p>
 
             <div className="flex gap-3">
-              {/* D.clearDataCancelBtn */}
               <button
-                id="D.clearDataCancelBtn"
                 onClick={() => setShowClearDataDialog(false)}
                 className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-lg font-medium transition-colors"
               >
                 Cancel
               </button>
 
-              {/* D.clearDataConfirmBtn */}
               <button
-                id="D.clearDataConfirmBtn"
                 onClick={handleClearLocalData}
                 className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-medium transition-colors"
               >
