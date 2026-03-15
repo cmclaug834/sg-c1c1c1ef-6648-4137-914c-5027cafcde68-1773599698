@@ -7,7 +7,7 @@ import { inspectionStorage } from "@/lib/inspectionStorage";
 import { exportAsJSON, exportAsPDF, getCompressedInspections } from "@/lib/inspectionExport";
 import { exportHealthReport, getHealthReports } from "@/lib/systemHealth";
 import { getDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
-import { storage } from "@/lib/storage";
+import { storage, archiveStorage } from "@/lib/storage";
 import type { Inspection } from "@/types/inspection";
 
 export default function Downloads() {
@@ -22,7 +22,7 @@ export default function Downloads() {
   }, []);
 
   const loadInspections = () => {
-    const allInspections = inspectionStorage.getAllInspections();
+    const allInspections = inspectionStorage.getInspections();
     setInspections(allInspections);
   };
 
@@ -92,9 +92,9 @@ export default function Downloads() {
   const downloadFullBackup = () => {
     const backup = {
       exportDate: new Date().toISOString(),
-      inspections: inspectionStorage.getAllInspections(),
-      tracks: storage.getAllTracks(),
-      archive: storage.getArchivedCars({ trackId: null }),
+      inspections: inspectionStorage.getInspections(),
+      tracks: storage.getTracks(),
+      archive: archiveStorage.getAll(),
       settings: {
         crew: storage.getActiveCrew(),
         appSettings: localStorage.getItem("appSettings")
@@ -305,12 +305,12 @@ export default function Downloads() {
                       </div>
                       <div className="font-medium truncate">{inspection.site || "Unnamed Site"}</div>
                       <div className="text-sm text-zinc-400 mt-1">
-                        {inspection.house && <span className="mr-3">House: {inspection.house}</span>}
-                        {inspection.vehicleId && <span>Vehicle: {inspection.vehicleId}</span>}
+                        {(inspection.houseCode || inspection.houseNumber) && <span className="mr-3">House: {inspection.houseCode || inspection.houseNumber}</span>}
+                        {(inspection.carNumber || inspection.vehicleId) && <span>Vehicle: {inspection.carNumber || inspection.vehicleId}</span>}
                       </div>
                       <div className="text-xs text-zinc-500 mt-1 flex items-center gap-2">
                         <Calendar className="w-3 h-3" />
-                        {new Date(inspection.date).toLocaleDateString()}
+                        {new Date(inspection.createdAt || inspection.dateTime || new Date().toISOString()).toLocaleDateString()}
                       </div>
                     </div>
                     <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
