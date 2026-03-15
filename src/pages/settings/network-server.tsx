@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { ArrowLeft, Wifi, WifiOff, Smartphone, Users, RefreshCw, Copy, Check, Settings as SettingsIcon, Globe, Server, QrCode, UserPlus, Shield, Clock } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { loadSyncConfig, saveSyncConfig, testServerConnection, getSyncStatus, syncNow } from "@/lib/sync";
 import { getUsers, saveUser, deleteUser, initializeAuth } from "@/lib/auth";
 import type { User } from "@/types/auth";
@@ -259,10 +260,12 @@ export default function NetworkServerSettings() {
                     <div className="text-center">
                       <p className="text-sm text-zinc-600 mb-4">Scan with mobile device to auto-configure</p>
                       <div className="inline-block p-4 bg-white border-4 border-zinc-200 rounded-lg">
-                        {/* QR Code would be generated here using a library like qrcode.react */}
-                        <div className="w-48 h-48 bg-zinc-100 flex items-center justify-center text-zinc-400">
-                          <QrCode className="w-16 h-16" />
-                        </div>
+                        <QRCodeSVG
+                          value={generateQRCodeData()}
+                          size={192}
+                          level="H"
+                          includeMargin={false}
+                        />
                       </div>
                       <p className="text-xs text-zinc-500 mt-4 font-mono">{`http://${localIP}:3000`}</p>
                     </div>
