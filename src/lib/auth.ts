@@ -52,6 +52,23 @@ function verifyPassword(password: string, hash: string): boolean {
 }
 
 /**
+ * Verify username and password for API
+ */
+export function verifyCredentials(username: string, password: string): { valid: boolean; user?: User } {
+  const user = getUserByUsername(username);
+  if (!user || !user.isActive) return { valid: false };
+  
+  const passwords: PasswordEntry[] = JSON.parse(localStorage.getItem(PASSWORDS_KEY) || "[]");
+  const passwordEntry = passwords.find((p) => p.userId === user.id);
+  
+  if (!passwordEntry || !verifyPassword(password, passwordEntry.hash)) {
+    return { valid: false };
+  }
+  
+  return { valid: true, user };
+}
+
+/**
  * Initialize default admin user
  */
 export function initializeAuth(): void {
@@ -150,6 +167,43 @@ export function decodeJWT(token: string): JWTPayload | null {
     return payload;
   } catch (error) {
     console.error("[Auth] Failed to decode JWT:", error);
+    return null;
+  }
+}
+
+const JWT_SECRET = "railyard_jwt_secret_demo_2026";
+
+/**
+ * Generate JWT Token
+ */
+export function generateJWT(payload: Omit<JWTPayload, "iat" | "exp">): string {
+  const iat = Date.now();
+  const exp = iat + 24 * 60 * 60 * 1000; // 24 hours
+  const fullPayload: JWTPayload = { ...payload, iat, exp };
+  
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = btoa(JSON.stringify(fullPayload));
+  const signature = btoa(header + body + JWT_SECRET);
+  
+  return `${header}.${body}.${signature}`;
+}
+
+/**
+ * Verify JWT Token
+ */
+export function verifyJWT(token: string): JWTPayload | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    
+    const payload = JSON.parse(atob(parts[1])) as JWTPayload;
+    
+    if (payload.exp && payload.exp < Date.now()) {
+      return null; // Expired
+    }
+    
+    return payload;
+  } catch (error) {
     return null;
   }
 }

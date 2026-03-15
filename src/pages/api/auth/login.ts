@@ -4,7 +4,7 @@
  */
 
 import type { NextApiResponse } from "next";
-import { verifyPassword, generateJWT } from "@/lib/auth";
+import { verifyCredentials, generateJWT } from "@/lib/auth";
 import { withMiddleware, AuthenticatedRequest } from "@/lib/apiMiddleware";
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -19,7 +19,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: "Username and password required" });
     }
 
-    const result = verifyPassword(username, password);
+    const result = verifyCredentials(username, password);
 
     if (!result.valid || !result.user) {
       return res.status(401).json({ error: "Invalid credentials" });
