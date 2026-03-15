@@ -2,18 +2,10 @@
  * API: Server health check
  */
 
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiResponse } from "next";
+import { withMiddleware, AuthenticatedRequest } from "@/lib/apiMiddleware";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Add CORS headers for internet access
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
   }
@@ -22,5 +14,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     status: "ok",
     timestamp: new Date().toISOString(),
     server: "Rail Yard Tracker Desktop Server",
+    version: "1.0.0",
+    user: req.user?.username || "anonymous",
   });
 }
+
+export default withMiddleware(handler, { auth: false, rateLimit: true });

@@ -1,26 +1,21 @@
 /**
- * API: User logout
+ * API: Logout endpoint
  */
 
-import type { NextApiRequest, NextApiResponse } from "next";
-import { logout, getCurrentSession } from "@/lib/auth";
+import type { NextApiResponse } from "next";
+import { withMiddleware, AuthenticatedRequest } from "@/lib/apiMiddleware";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // With JWT, logout is client-side (delete token)
+  // Server can maintain a blacklist for extra security (optional)
   
-  try {
-    const session = getCurrentSession();
-    
-    if (!session) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-    
-    logout();
-    res.status(200).json({ success: true });
-  } catch (error) {
-    console.error("[API Logout] Error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
+  console.log(`[API Logout] User ${req.user?.username} logged out`);
+
+  res.status(200).json({ success: true });
 }
+
+export default withMiddleware(handler, { auth: false, rateLimit: true });

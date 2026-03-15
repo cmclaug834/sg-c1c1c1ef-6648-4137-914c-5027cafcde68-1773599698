@@ -3,25 +3,11 @@
  * Handles incoming changes from mobile devices
  */
 
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiResponse } from "next";
 import { SyncChange } from "@/lib/sync";
+import { withMiddleware, AuthenticatedRequest } from "@/lib/apiMiddleware";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Add CORS headers for internet access
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  // Basic authorization check
-  const authHeader = req.headers.authorization;
-  if (!authHeader || (!authHeader.startsWith("Bearer ") && !authHeader.startsWith("Basic "))) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
@@ -33,9 +19,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: "Invalid request format" });
     }
     
-    // TODO: In production, validate auth token from request headers
-    // const authHeader = req.headers.authorization;
-    // if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    // Log authenticated user
+    console.log(`[API Sync] User: ${req.user?.username} | Changes: ${changes.length}`);
     
     // Process each change
     changes.forEach((change) => {
@@ -57,3 +42,5 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     res.status(500).json({ error: "Internal server error" });
   }
 }
+
+export default withMiddleware(handler, { auth: true, rateLimit: true });
