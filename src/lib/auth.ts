@@ -3,7 +3,7 @@
  * Updated to support JWT-based authentication for internet-accessible servers
  */
 import { User, AuthSession, LoginCredentials, UserRole, UserPermissions, ROLE_PERMISSIONS } from "@/types/auth";
-import { loadBackendConfig } from "./backendConfig";
+import { loadBackendConfig, saveBackendConfig } from "./backendConfig";
 
 const USERS_STORAGE_KEY = "railyard_users";
 const SESSIONS_STORAGE_KEY = "railyard_sessions";
@@ -182,7 +182,6 @@ export async function loginWithServer(credentials: LoginCredentials): Promise<Au
 
           // Update backend config with token
           config.network.jwtToken = data.token;
-          const { saveBackendConfig } = await import("./backendConfig");
           saveBackendConfig(config);
 
           // Create local session object to match existing types
@@ -268,7 +267,6 @@ export function logout(): void {
   try {
     const config = loadBackendConfig();
     config.network.jwtToken = undefined;
-    const { saveBackendConfig } = require("./backendConfig");
     saveBackendConfig(config);
   } catch (e) {
     console.error("Failed to clear token from config", e);

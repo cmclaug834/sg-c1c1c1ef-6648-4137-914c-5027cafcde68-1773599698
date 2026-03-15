@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { ArrowLeft, Wifi, WifiOff, Smartphone, Users, RefreshCw, Copy, Check, Settings as SettingsIcon, Globe, Server, QrCode, UserPlus, Shield, Clock } from "lucide-react";
+import { ArrowLeft, Wifi, WifiOff, Smartphone, Users, RefreshCw, Copy, Check, Globe, Server, QrCode, UserPlus, Shield, Clock, AlertCircle, ExternalLink, Zap } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { loadSyncConfig, saveSyncConfig, testServerConnection, getSyncStatus, syncNow } from "@/lib/sync";
 import { getUsers, saveUser, deleteUser, initializeAuth } from "@/lib/auth";
+import { loadBackendConfig, saveBackendConfig, validateServerUrl, isLocalUrl, detectServerType } from "@/lib/backendConfig";
 import type { User } from "@/types/auth";
 
 export default function NetworkServerSettings() {
   const router = useRouter();
   const [config, setConfig] = useState(loadSyncConfig());
+  const [backendConfig, setBackendConfig] = useState(loadBackendConfig());
   const [syncStatus, setSyncStatus] = useState(getSyncStatus());
   const [serverEnabled, setServerEnabled] = useState(false);
-  const [localIP, setLocalIP] = useState("192.168.1.100");
+  const [serverUrl, setServerUrl] = useState("");
   const [showQRCode, setShowQRCode] = useState(false);
-  const [copiedIP, setCopiedIP] = useState(false);
+  const [copiedURL, setCopiedURL] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -23,18 +25,23 @@ export default function NetworkServerSettings() {
     password: "",
   });
   const [testingConnection, setTestingConnection] = useState(false);
-  const [connectionResult, setConnectionResult] = useState<{ success: boolean; latency?: number; error?: string } | null>(null);
+  const [connectionResult, setConnectionResult] = useState<{ success: boolean; httpsEnabled?: boolean; latency?: number; error?: string } | null>(null);
+  const [urlValidation, setUrlValidation] = useState<{ valid: boolean; error?: string } | null>(null);
 
   useEffect(() => {
     // Initialize auth system
     initializeAuth();
     loadUsers();
-    detectLocalIP();
     
-    // Check if server is already enabled
+    // Load existing server URL
     const savedConfig = loadSyncConfig();
+    const savedBackendConfig = loadBackendConfig();
+    
     if (savedConfig.enabled && savedConfig.serverUrl) {
       setServerEnabled(true);
+      setServerUrl(savedConfig.serverUrl);
+    } else if (savedBackendConfig.network.serverUrl) {
+      setServerUrl(savedBackendConfig.network.serverUrl);
     }
     
     // Periodic sync status update
@@ -50,33 +57,64 @@ export default function NetworkServerSettings() {
     setUsers(allUsers);
   };
 
-  const detectLocalIP = () => {
-    // In a real desktop app, use native APIs to get local IP
-    // For now, simulate detection
-    if (typeof window !== "undefined") {
-      // This would be replaced with actual IP detection in Electron/Tauri
-      // Example: const ip = await window.electron.getLocalIP();
-      setLocalIP("192.168.1.100");
+  const handleServerUrlChange = (url: string) => {
+    setServerUrl(url);
+    
+    // Validate URL as user types
+    if (url.trim()) {
+      const validation = validateServerUrl(url);
+      setUrlValidation(validation);
+    } else {
+      setUrlValidation(null);
     }
   };
 
   const handleEnableServer = () => {
-    const newEnabled = !serverEnabled;
-    setServerEnabled(newEnabled);
-    
-    if (newEnabled) {
-      // Enable sync with local server URL
-      const serverUrl = `http://${localIP}:3000`;
+    if (!serverEnabled) {
+      // Enabling server - validate URL first
+      if (!serverUrl.trim()) {
+        alert("Please enter a server URL first");
+        return;
+      }
+      
+      const validation = validateServerUrl(serverUrl);
+      if (!validation.valid) {
+        alert(validation.error || "Invalid server URL");
+        return;
+      }
+      
+      const normalizedUrl = validation.normalized!;
+      const serverType = detectServerType(normalizedUrl);
+      const useHTTPS = normalizedUrl.startsWith("https://");
+      
+      // Update sync config
       const updatedConfig = {
         ...config,
         enabled: true,
-        serverUrl,
+        serverUrl: normalizedUrl,
         autoSync: true,
       };
       saveSyncConfig(updatedConfig);
       setConfig(updatedConfig);
       
-      console.log("[Network] Desktop server enabled at:", serverUrl);
+      // Update backend config
+      const updatedBackendConfig = {
+        ...backendConfig,
+        network: {
+          ...backendConfig.network,
+          serverUrl: normalizedUrl,
+          useHTTPS,
+          allowHTTP: isLocalUrl(normalizedUrl),
+        },
+        serverType,
+      };
+      saveBackendConfig(updatedBackendConfig);
+      setBackendConfig(updatedBackendConfig);
+      
+      setServerEnabled(true);
+      setServerUrl(normalizedUrl);
+      
+      console.log("[Network] Server enabled:", normalizedUrl, "Type:", serverType, "HTTPS:", useHTTPS);
     } else {
       // Disable server
       const updatedConfig = {
@@ -87,14 +125,30 @@ export default function NetworkServerSettings() {
       };
       saveSyncConfig(updatedConfig);
       setConfig(updatedConfig);
+      
+      const updatedBackendConfig = {
+        ...backendConfig,
+        network: {
+          ...backendConfig.network,
+          serverUrl: "",
+        },
+      };
+      saveBackendConfig(updatedBackendConfig);
+      setBackendConfig(updatedBackendConfig);
+      
+      setServerEnabled(false);
     }
   };
 
   const handleTestConnection = async () => {
+    if (!serverUrl.trim()) {
+      alert("Please enter a server URL first");
+      return;
+    }
+    
     setTestingConnection(true);
     setConnectionResult(null);
     
-    const serverUrl = `http://${localIP}:3000`;
     const result = await testServerConnection(serverUrl);
     
     setConnectionResult(result);
@@ -106,11 +160,10 @@ export default function NetworkServerSettings() {
     setSyncStatus(getSyncStatus());
   };
 
-  const handleCopyIP = () => {
-    const serverUrl = `http://${localIP}:3000`;
+  const handleCopyURL = () => {
     navigator.clipboard.writeText(serverUrl);
-    setCopiedIP(true);
-    setTimeout(() => setCopiedIP(false), 2000);
+    setCopiedURL(true);
+    setTimeout(() => setCopiedURL(false), 2000);
   };
 
   const handleAddUser = () => {
@@ -150,11 +203,40 @@ export default function NetworkServerSettings() {
 
   const generateQRCodeData = () => {
     return JSON.stringify({
-      serverUrl: `http://${localIP}:3000`,
+      serverUrl: serverUrl,
       setupType: "mobile",
       timestamp: new Date().toISOString(),
     });
   };
+
+  const getServerTypeInfo = () => {
+    if (!serverUrl) return { label: "Not Configured", color: "zinc" };
+    
+    const type = detectServerType(serverUrl);
+    const isHTTPS = serverUrl.startsWith("https://");
+    
+    if (type === "local") {
+      return { 
+        label: "Local Network", 
+        color: "blue",
+        description: "Only accessible on same WiFi network"
+      };
+    } else if (type === "tunnel") {
+      return { 
+        label: "Tunnel Service", 
+        color: "purple",
+        description: "Accessible from anywhere via tunnel"
+      };
+    } else {
+      return { 
+        label: isHTTPS ? "Cloud Server (HTTPS)" : "Cloud Server", 
+        color: isHTTPS ? "green" : "yellow",
+        description: isHTTPS ? "Accessible from anywhere (secure)" : "Accessible from anywhere (use HTTPS!)"
+      };
+    }
+  };
+
+  const serverTypeInfo = getServerTypeInfo();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 pb-safe-bottom-nav">
@@ -183,9 +265,9 @@ export default function NetworkServerSettings() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="space-y-6">
           
-          {/* Server Status */}
+          {/* Server Configuration */}
           <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${serverEnabled ? "bg-green-500/10" : "bg-zinc-700"}`}>
                   {serverEnabled ? (
@@ -195,112 +277,161 @@ export default function NetworkServerSettings() {
                   )}
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Desktop Server</h2>
+                  <h2 className="text-lg font-semibold text-white">Server Connection</h2>
                   <p className="text-sm text-zinc-400">
-                    {serverEnabled ? "Running - Mobile devices can connect" : "Disabled - No network access"}
+                    {serverEnabled ? "Connected - Devices can sync" : "Disabled - No network sync"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={handleEnableServer}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                disabled={!serverUrl.trim() && !serverEnabled}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   serverEnabled
                     ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
                     : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
                 }`}
               >
-                {serverEnabled ? "Disable Server" : "Enable Server"}
+                {serverEnabled ? "Disable" : "Enable"}
               </button>
             </div>
 
-            {serverEnabled && (
-              <div className="mt-6 pt-6 border-t border-zinc-700 space-y-4">
-                {/* Server URL */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Server Address</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={`http://${localIP}:3000`}
-                      readOnly
-                      className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white font-mono"
-                    />
-                    <button
-                      onClick={handleCopyIP}
-                      className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      {copiedIP ? (
-                        <>
-                          <Check className="w-4 h-4 text-green-400" />
-                          <span className="text-green-400">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4 text-zinc-300" />
-                          <span className="text-zinc-300">Copy</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setShowQRCode(!showQRCode)}
-                      className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      QR Code
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-zinc-500">
-                    Mobile devices on the same WiFi network can connect using this address
-                  </p>
+            {/* Server URL Input */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Server URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={serverUrl}
+                    onChange={(e) => handleServerUrlChange(e.target.value)}
+                    placeholder="https://tracking.yourcompany.com or http://192.168.1.100:3000"
+                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                  <button
+                    onClick={handleCopyURL}
+                    disabled={!serverUrl.trim()}
+                    className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {copiedURL ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-400" />
+                        <span className="text-green-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-zinc-300" />
+                        <span className="text-zinc-300">Copy</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                {/* QR Code Display */}
-                {showQRCode && (
-                  <div className="bg-white p-6 rounded-lg">
-                    <div className="text-center">
-                      <p className="text-sm text-zinc-600 mb-4">Scan with mobile device to auto-configure</p>
-                      <div className="inline-block p-4 bg-white border-4 border-zinc-200 rounded-lg">
-                        <QRCodeSVG
-                          value={generateQRCodeData()}
-                          size={192}
-                          level="H"
-                          includeMargin={false}
-                        />
-                      </div>
-                      <p className="text-xs text-zinc-500 mt-4 font-mono">{`http://${localIP}:3000`}</p>
-                    </div>
+                
+                {/* URL Validation Feedback */}
+                {urlValidation && !urlValidation.valid && (
+                  <div className="mt-2 flex items-start gap-2 text-sm text-red-400">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>{urlValidation.error}</span>
                   </div>
                 )}
+                {urlValidation && urlValidation.valid && urlValidation.error && (
+                  <div className="mt-2 flex items-start gap-2 text-sm text-yellow-400">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>{urlValidation.error}</span>
+                  </div>
+                )}
+                
+                <p className="mt-2 text-xs text-zinc-500">
+                  Enter your server domain (e.g., tracking.company.com) or IP address (e.g., 192.168.1.100:3000)
+                </p>
+              </div>
 
-                {/* Connection Test */}
-                <div className="flex gap-2">
+              {/* Server Type Badge */}
+              {serverUrl && (
+                <div className={`p-4 bg-${serverTypeInfo.color}-500/10 border border-${serverTypeInfo.color}-500/20 rounded-lg`}>
+                  <div className="flex items-start gap-3">
+                    <Globe className={`w-5 h-5 text-${serverTypeInfo.color}-400 mt-0.5`} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-sm font-semibold text-${serverTypeInfo.color}-400`}>
+                          {serverTypeInfo.label}
+                        </span>
+                        {serverUrl.startsWith("https://") && (
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
+                            HTTPS Secure
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400">{serverTypeInfo.description}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Connection Test */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || !serverUrl.trim()}
+                  className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Globe className={`w-4 h-4 ${testingConnection ? "animate-spin" : ""}`} />
+                  {testingConnection ? "Testing..." : "Test Connection"}
+                </button>
+                {connectionResult && (
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                    connectionResult.success ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+                  }`}>
+                    {connectionResult.success ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Connected ({connectionResult.latency}ms)</span>
+                        {connectionResult.httpsEnabled && (
+                          <Shield className="w-4 h-4 ml-1" />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Failed: {connectionResult.error}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* QR Code */}
+              {serverUrl && (
+                <div>
                   <button
-                    onClick={handleTestConnection}
-                    disabled={testingConnection}
-                    className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                    onClick={() => setShowQRCode(!showQRCode)}
+                    className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors flex items-center gap-2"
                   >
-                    <Globe className={`w-4 h-4 ${testingConnection ? "animate-spin" : ""}`} />
-                    {testingConnection ? "Testing..." : "Test Connection"}
+                    <QrCode className="w-4 h-4" />
+                    {showQRCode ? "Hide QR Code" : "Show QR Code"}
                   </button>
-                  {connectionResult && (
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                      connectionResult.success ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
-                    }`}>
-                      {connectionResult.success ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>Connected ({connectionResult.latency}ms)</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Failed: {connectionResult.error}</span>
-                        </>
-                      )}
+                  
+                  {showQRCode && (
+                    <div className="mt-4 bg-white p-6 rounded-lg">
+                      <div className="text-center">
+                        <p className="text-sm text-zinc-600 mb-4">Scan with mobile device to auto-configure</p>
+                        <div className="inline-block p-4 bg-white border-4 border-zinc-200 rounded-lg">
+                          <QRCodeSVG
+                            value={generateQRCodeData()}
+                            size={192}
+                            level="H"
+                            includeMargin={false}
+                          />
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-4 font-mono">{serverUrl}</p>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Sync Status */}
@@ -532,29 +663,78 @@ export default function NetworkServerSettings() {
             <div className="flex items-start gap-3">
               <Smartphone className="w-5 h-5 text-blue-400 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-white font-semibold mb-2">Connecting Mobile Devices</h3>
+                <h3 className="text-white font-semibold mb-2">Setup Instructions</h3>
                 <ol className="space-y-2 text-sm text-zinc-300">
                   <li className="flex gap-2">
                     <span className="font-semibold">1.</span>
-                    <span>Enable the desktop server above</span>
+                    <span>Enter your server URL above (domain or IP address)</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold">2.</span>
-                    <span>Ensure mobile device is on the same WiFi network</span>
+                    <span>Click "Test Connection" to verify server is reachable</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold">3.</span>
-                    <span>On mobile: Scan QR code OR manually enter server address</span>
+                    <span>Click "Enable" to activate sync</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold">4.</span>
-                    <span>Login with user credentials created above</span>
+                    <span>On mobile: Scan QR code OR manually enter server URL in settings</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold">5.</span>
-                    <span>Mobile device will sync automatically every 30 seconds</span>
+                    <span>Login with user credentials created above</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold">6.</span>
+                    <span>Data will sync automatically every 30 seconds</span>
                   </li>
                 </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Deployment Options */}
+          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Zap className="w-5 h-5 text-yellow-400" />
+              <h3 className="text-white font-semibold">Deployment Options</h3>
+            </div>
+            <div className="space-y-3 text-sm text-zinc-300">
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 bg-blue-500/10 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-blue-400 font-semibold text-xs">1</span>
+                </div>
+                <div>
+                  <span className="text-white font-medium">Local Network:</span>
+                  <span className="text-zinc-400"> Use IP address (e.g., http://192.168.1.100:3000) - WiFi only</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 bg-purple-500/10 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-purple-400 font-semibold text-xs">2</span>
+                </div>
+                <div>
+                  <span className="text-white font-medium">Tunnel Service:</span>
+                  <span className="text-zinc-400"> Use Cloudflare Tunnel, ngrok, or Tailscale - works from anywhere, auto HTTPS</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 bg-green-500/10 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-green-400 font-semibold text-xs">3</span>
+                </div>
+                <div>
+                  <span className="text-white font-medium">Cloud Hosting:</span>
+                  <span className="text-zinc-400"> Deploy to DigitalOcean, AWS, or similar - professional setup with domain</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Shield className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-yellow-300">
+                  <strong>Security Tip:</strong> Always use HTTPS (https://) for internet-accessible servers. HTTP is only safe for local network testing.
+                </p>
               </div>
             </div>
           </div>
