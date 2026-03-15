@@ -601,7 +601,7 @@ export default function TrackDetail() {
       </div>
 
       {/* Car List */}
-      <div id="B.carList" className="flex-1 overflow-y-auto" style={{ paddingBottom: `calc(${BOTTOM_BAR_H}px + env(safe-area-inset-bottom))` }}>
+      <div id="B.carList" className="flex-1 overflow-y-auto pb-safe-bottom-nav">
         <div className="max-w-4xl mx-auto px-4 py-4">
           {filteredCars.length === 0 ? (
             <div className="text-center py-12 text-zinc-500">

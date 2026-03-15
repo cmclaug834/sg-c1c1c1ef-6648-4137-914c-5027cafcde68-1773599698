@@ -84,6 +84,11 @@
     text-wrap: balance;
   }
   
+  /* Padding for pages with bottom navigation */
+  .pb-safe-bottom-nav {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+  
   @keyframes slide-up {
     from {
       transform: translateY(100%);

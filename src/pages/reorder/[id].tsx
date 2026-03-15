@@ -77,7 +77,7 @@ export default function TrackReorder() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white pb-24">
+    <div className="min-h-screen bg-zinc-900 text-white pb-safe-bottom-nav">
       {/* Header */}
       <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">

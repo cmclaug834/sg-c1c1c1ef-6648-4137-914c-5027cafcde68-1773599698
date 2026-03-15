@@ -1,6 +1,17 @@
 import { useRouter } from "next/router";
 import { ClipboardList, ArrowUpDown, Settings, ClipboardCheck } from "lucide-react";
 
+/**
+ * Bottom Navigation Component
+ * 
+ * IMPORTANT: Pages using this component MUST add pb-safe-bottom-nav class
+ * to their main container to prevent content from being hidden.
+ * 
+ * Example:
+ * <div className="min-h-screen pb-safe-bottom-nav">
+ *   {content}
+ * </div>
+ */
 export function BottomNav() {
   const router = useRouter();
   const { pathname } = router;

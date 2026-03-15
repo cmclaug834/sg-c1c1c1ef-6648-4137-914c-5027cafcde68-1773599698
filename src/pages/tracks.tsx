@@ -132,7 +132,7 @@ export default function TrackSelect() {
   const hasResults = matchingTracks.length > 0 || matchingCars.length > 0;
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
+    <div className="min-h-screen bg-zinc-900 text-white pb-safe-bottom-nav">
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* A.headerTitle + A.headerDate */}
         <div className="mb-6">

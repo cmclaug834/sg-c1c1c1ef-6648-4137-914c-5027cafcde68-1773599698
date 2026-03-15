@@ -169,7 +169,7 @@ export default function InspectionsHome() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white pb-20">
+    <div className="min-h-screen bg-zinc-900 text-white pb-safe-bottom-nav">
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
