@@ -1,12 +1,23 @@
 /**
  * Authentication and User Management
+ * Updated to support JWT-based authentication for internet-accessible servers
  */
-
 import { User, AuthSession, LoginCredentials, UserRole, UserPermissions, ROLE_PERMISSIONS } from "@/types/auth";
+import { loadBackendConfig } from "./backendConfig";
 
 const USERS_STORAGE_KEY = "railyard_users";
 const SESSIONS_STORAGE_KEY = "railyard_sessions";
 const CURRENT_SESSION_KEY = "railyard_current_session";
+const JWT_TOKEN_KEY = "railyard_jwt_token";
+const REFRESH_TOKEN_KEY = "railyard_refresh_token";
+
+export interface JWTPayload {
+  userId: string;
+  username: string;
+  role: string;
+  iat: number; // Issued at
+  exp: number; // Expires at
+}
 
 // Default admin user (created on first use)
 const DEFAULT_ADMIN: User = {
@@ -74,13 +85,11 @@ function saveUsers(users: User[]): void {
 export function saveUser(user: User, password?: string): void {
   const users = getUsers();
   const index = users.findIndex((u) => u.id === user.id);
-  
   if (index >= 0) {
     users[index] = user;
   } else {
     users.push(user);
   }
-  
   saveUsers(users);
   
   // Save password if provided
@@ -88,13 +97,11 @@ export function saveUser(user: User, password?: string): void {
     const passwords: PasswordEntry[] = JSON.parse(localStorage.getItem(PASSWORDS_KEY) || "[]");
     const passIndex = passwords.findIndex((p) => p.userId === user.id);
     const hash = simpleHash(password);
-    
     if (passIndex >= 0) {
       passwords[passIndex].hash = hash;
     } else {
       passwords.push({ userId: user.id, hash });
     }
-    
     localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
   }
 }
@@ -133,7 +140,79 @@ export function getUserByUsername(username: string): User | null {
 }
 
 /**
- * Login user
+ * Decode JWT token without verification (client-side only)
+ */
+export function decodeJWT(token: string): JWTPayload | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload;
+  } catch (error) {
+    console.error("[Auth] Failed to decode JWT:", error);
+    return null;
+  }
+}
+
+/**
+ * Login user (Hybrid: Local fallback + Remote JWT)
+ */
+export async function loginWithServer(credentials: LoginCredentials): Promise<AuthSession | null> {
+  const config = loadBackendConfig();
+  const serverUrl = config.network.serverUrl;
+
+  // If we have a server URL, try remote login first
+  if (serverUrl) {
+    try {
+      const response = await fetch(`${serverUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.token && data.user) {
+          // Store JWT token
+          localStorage.setItem(JWT_TOKEN_KEY, data.token);
+          if (data.refreshToken) {
+            localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+          }
+
+          // Update backend config with token
+          config.network.jwtToken = data.token;
+          const { saveBackendConfig } = await import("./backendConfig");
+          saveBackendConfig(config);
+
+          // Create local session object to match existing types
+          const session: AuthSession = {
+            userId: data.user.id,
+            token: data.token,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            deviceId: generateDeviceId(),
+            deviceName: credentials.deviceName,
+          };
+          
+          localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(session));
+          
+          // Save user locally for offline access
+          saveUser(data.user);
+          
+          return session;
+        }
+      }
+    } catch (error) {
+      console.warn("[Auth] Remote login failed, falling back to local auth", error);
+    }
+  }
+
+  // Fallback to local authentication
+  return login(credentials);
+}
+
+/**
+ * Original Local Login (Kept for compatibility and offline fallback)
  */
 export function login(credentials: LoginCredentials): AuthSession | null {
   const user = getUserByUsername(credentials.username);
@@ -142,7 +221,6 @@ export function login(credentials: LoginCredentials): AuthSession | null {
   // Verify password
   const passwords: PasswordEntry[] = JSON.parse(localStorage.getItem(PASSWORDS_KEY) || "[]");
   const passwordEntry = passwords.find((p) => p.userId === user.id);
-  
   if (!passwordEntry || !verifyPassword(credentials.password, passwordEntry.hash)) {
     return null;
   }
@@ -183,6 +261,18 @@ export function logout(): void {
   }
   
   localStorage.removeItem(CURRENT_SESSION_KEY);
+  localStorage.removeItem(JWT_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  
+  // Clear token from config
+  try {
+    const config = loadBackendConfig();
+    config.network.jwtToken = undefined;
+    const { saveBackendConfig } = require("./backendConfig");
+    saveBackendConfig(config);
+  } catch (e) {
+    console.error("Failed to clear token from config", e);
+  }
 }
 
 /**
@@ -246,7 +336,6 @@ export function getUserPermissions(user: User | null): UserPermissions {
       canConfigureSystem: false,
     };
   }
-  
   return ROLE_PERMISSIONS[user.role];
 }
 
@@ -269,6 +358,7 @@ function generateToken(): string {
  * Generate device ID
  */
 function generateDeviceId(): string {
+  if (typeof window === "undefined") return "server";
   let deviceId = localStorage.getItem("railyard_device_id");
   if (!deviceId) {
     deviceId = `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -285,4 +375,25 @@ export function cleanupExpiredSessions(): void {
   const now = new Date();
   const active = sessions.filter((s) => new Date(s.expiresAt) > now);
   saveSessions(active);
+}
+
+/**
+ * Get authorization header for API requests
+ */
+export function getAuthHeader(): { Authorization?: string } {
+  if (typeof window === "undefined") return {};
+  
+  // Try JWT first
+  const jwt = localStorage.getItem(JWT_TOKEN_KEY);
+  if (jwt) {
+    return { Authorization: `Bearer ${jwt}` };
+  }
+  
+  // Fallback to local session token
+  const session = getCurrentSession();
+  if (session?.token) {
+    return { Authorization: `Bearer ${session.token}` };
+  }
+  
+  return {};
 }

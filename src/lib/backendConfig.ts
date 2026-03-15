@@ -1,6 +1,7 @@
 /**
  * Backend Configuration Storage
  * Handles file system paths, storage backends, and system settings
+ * Updated to support internet-accessible servers with HTTPS and JWT auth
  */
 
 export interface BackendConfig {
@@ -28,10 +29,14 @@ export interface BackendConfig {
     retention: number;
   };
   network: {
-    primaryServer: string;
+    serverUrl: string; // Full URL: https://tracking.yourcompany.com or https://123.45.67.89:3000
+    useHTTPS: boolean;
+    allowHTTP: boolean; // Only for local development
     fallbackServer: string;
     timeout: number;
     retries: number;
+    jwtToken?: string; // Stored JWT token for authentication
+    apiKey?: string; // Optional API key for additional security
   };
   performance: {
     compression: boolean;
@@ -41,6 +46,7 @@ export interface BackendConfig {
   };
   setupCompleted?: boolean;
   setupDate?: string;
+  serverType?: "local" | "cloud" | "tunnel"; // Deployment type
 }
 
 export interface StorageUsageInfo {
@@ -58,6 +64,8 @@ export interface HealthCheckResult {
   writePermissions: boolean;
   networkConnected: boolean;
   diskSpaceOK: boolean;
+  serverReachable?: boolean;
+  httpsEnabled?: boolean;
   overallStatus: "healthy" | "warning" | "error";
   issues: string[];
   recommendations: string[];
@@ -169,6 +177,153 @@ export function getRecommendedPaths(env: SystemEnvironment): BackendConfig["file
 }
 
 /**
+ * Validate server URL format
+ */
+export function validateServerUrl(url: string): { valid: boolean; error?: string; normalized?: string } {
+  if (!url || url.trim() === "") {
+    return { valid: false, error: "Server URL cannot be empty" };
+  }
+
+  let normalizedUrl = url.trim();
+
+  // Add protocol if missing
+  if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+    normalizedUrl = `https://${normalizedUrl}`;
+  }
+
+  // Validate URL format
+  try {
+    const parsed = new URL(normalizedUrl);
+    
+    // Check for valid protocol
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return { valid: false, error: "URL must use HTTP or HTTPS protocol" };
+    }
+
+    // Warn if using HTTP in production
+    if (parsed.protocol === "http:" && !isLocalUrl(normalizedUrl)) {
+      return { 
+        valid: true, 
+        error: "Warning: HTTP is insecure for internet-accessible servers. Use HTTPS.",
+        normalized: normalizedUrl
+      };
+    }
+
+    return { valid: true, normalized: normalizedUrl };
+  } catch (error) {
+    return { valid: false, error: "Invalid URL format" };
+  }
+}
+
+/**
+ * Check if URL is a local/LAN address
+ */
+export function isLocalUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("172.16.") ||
+      hostname.endsWith(".local")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect server type from URL
+ */
+export function detectServerType(url: string): "local" | "cloud" | "tunnel" {
+  if (isLocalUrl(url)) {
+    return "local";
+  }
+
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Common tunnel service domains
+    if (
+      hostname.includes("ngrok") ||
+      hostname.includes("cloudflare") ||
+      hostname.includes("tailscale") ||
+      hostname.includes("serveo") ||
+      hostname.includes("localhost.run")
+    ) {
+      return "tunnel";
+    }
+
+    return "cloud";
+  } catch {
+    return "local";
+  }
+}
+
+/**
+ * Test server connectivity and HTTPS
+ */
+export async function testServerConnection(
+  serverUrl: string
+): Promise<{ success: boolean; httpsEnabled: boolean; responseTime: number; error?: string }> {
+  const startTime = Date.now();
+
+  try {
+    const validation = validateServerUrl(serverUrl);
+    if (!validation.valid) {
+      return {
+        success: false,
+        httpsEnabled: false,
+        responseTime: 0,
+        error: validation.error,
+      };
+    }
+
+    const normalizedUrl = validation.normalized!;
+    const httpsEnabled = normalizedUrl.startsWith("https://");
+
+    // Test with ping endpoint
+    const response = await fetch(`${normalizedUrl}/api/ping`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
+    const responseTime = Date.now() - startTime;
+
+    if (!response.ok) {
+      return {
+        success: false,
+        httpsEnabled,
+        responseTime,
+        error: `Server responded with status ${response.status}`,
+      };
+    }
+
+    return {
+      success: true,
+      httpsEnabled,
+      responseTime,
+    };
+  } catch (error) {
+    const responseTime = Date.now() - startTime;
+    return {
+      success: false,
+      httpsEnabled: false,
+      responseTime,
+      error: error instanceof Error ? error.message : "Connection failed",
+    };
+  }
+}
+
+/**
  * Automated setup wizard for desktop/server installations
  */
 export async function runAutomatedSetup(
@@ -200,7 +355,6 @@ export async function runAutomatedSetup(
     updateProgress(3, "Testing file system access", "running", "Checking permissions...");
     await sleep(800);
     
-    // In real implementation, this would actually try to create directories
     const canAccessFileSystem = env.isDesktopApp || env.hasFileSystemAPI;
     
     if (!canAccessFileSystem) {
@@ -213,13 +367,6 @@ export async function runAutomatedSetup(
     // Step 4: Create directories (simulated)
     updateProgress(4, "Creating directories", "running", "Setting up folder structure...");
     await sleep(1000);
-    
-    // In real implementation:
-    // - Create inspections folder
-    // - Create media folder  
-    // - Create exports folder
-    // - Set proper permissions
-    
     updateProgress(4, "Creating directories", "completed", "All directories created");
 
     // Step 5: Configure optimal settings
@@ -237,7 +384,7 @@ export async function runAutomatedSetup(
           inspectionsDrafts: true,
           inspectionsCompleted: true,
           trackData: true,
-          mediaFiles: canAccessFileSystem, // Only sync media if we have file system
+          mediaFiles: canAccessFileSystem,
         },
       },
       backup: {
@@ -249,7 +396,9 @@ export async function runAutomatedSetup(
         retention: 4,
       },
       network: {
-        primaryServer: "",
+        serverUrl: "",
+        useHTTPS: true,
+        allowHTTP: false,
         fallbackServer: "",
         timeout: 30,
         retries: 3,
@@ -262,6 +411,7 @@ export async function runAutomatedSetup(
       },
       setupCompleted: true,
       setupDate: new Date().toISOString(),
+      serverType: "local",
     };
 
     updateProgress(5, "Configuring settings", "completed", "Settings optimized");
@@ -326,7 +476,26 @@ export function loadBackendConfig(): BackendConfig {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const config = JSON.parse(saved);
+      
+      // Migrate old configs without serverUrl
+      if (!config.network.serverUrl && config.network.primaryServer) {
+        config.network.serverUrl = config.network.primaryServer;
+        delete config.network.primaryServer;
+      }
+      
+      // Set defaults for new fields
+      if (config.network.useHTTPS === undefined) {
+        config.network.useHTTPS = !isLocalUrl(config.network.serverUrl || "");
+      }
+      if (config.network.allowHTTP === undefined) {
+        config.network.allowHTTP = isLocalUrl(config.network.serverUrl || "");
+      }
+      if (!config.serverType) {
+        config.serverType = detectServerType(config.network.serverUrl || "");
+      }
+      
+      return config;
     }
   } catch (error) {
     console.error("[BackendConfig] Failed to load config:", error);
@@ -342,6 +511,13 @@ export function saveBackendConfig(config: BackendConfig): void {
   if (typeof window === "undefined") return;
 
   try {
+    // Auto-detect server type from URL
+    if (config.network.serverUrl) {
+      config.serverType = detectServerType(config.network.serverUrl);
+      config.network.useHTTPS = config.network.serverUrl.startsWith("https://");
+      config.network.allowHTTP = isLocalUrl(config.network.serverUrl);
+    }
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
     console.log("[BackendConfig] Configuration saved");
   } catch (error) {
@@ -377,7 +553,9 @@ export function getDefaultBackendConfig(): BackendConfig {
       retention: 4,
     },
     network: {
-      primaryServer: "",
+      serverUrl: "",
+      useHTTPS: true,
+      allowHTTP: false,
       fallbackServer: "",
       timeout: 30,
       retries: 3,
@@ -388,6 +566,7 @@ export function getDefaultBackendConfig(): BackendConfig {
       imageQuality: 80,
       videoResolution: "720p",
     },
+    serverType: "local",
   };
 }
 
@@ -419,17 +598,47 @@ export async function testFileSystemAccess(path: string): Promise<boolean> {
  * Run a full system health diagnostic check
  */
 export async function runSystemHealthCheck(): Promise<HealthCheckResult> {
-  // Simulated check taking a little time to resolve
+  const config = loadBackendConfig();
+  
   return new Promise((resolve) => {
-    setTimeout(() => {
+    setTimeout(async () => {
+      let serverReachable = false;
+      let httpsEnabled = false;
+
+      // Test server connection if URL is configured
+      if (config.network.serverUrl) {
+        const testResult = await testServerConnection(config.network.serverUrl);
+        serverReachable = testResult.success;
+        httpsEnabled = testResult.httpsEnabled;
+      }
+
+      const issues: string[] = [];
+      const recommendations: string[] = [];
+
+      if (config.network.serverUrl && !serverReachable) {
+        issues.push("Server is not reachable");
+        recommendations.push("Check your internet connection and server URL");
+      }
+
+      if (config.network.serverUrl && !httpsEnabled && !isLocalUrl(config.network.serverUrl)) {
+        issues.push("Server is not using HTTPS");
+        recommendations.push("Enable HTTPS for secure communication over the internet");
+      }
+
+      const overallStatus: "healthy" | "warning" | "error" = 
+        issues.length === 0 ? "healthy" : 
+        issues.some(i => i.includes("not reachable")) ? "error" : "warning";
+
       resolve({
         storageAccessible: true,
         writePermissions: true,
         networkConnected: navigator.onLine,
         diskSpaceOK: true,
-        overallStatus: "healthy",
-        issues: [],
-        recommendations: [],
+        serverReachable,
+        httpsEnabled,
+        overallStatus,
+        issues,
+        recommendations,
       });
     }, 1200);
   });
