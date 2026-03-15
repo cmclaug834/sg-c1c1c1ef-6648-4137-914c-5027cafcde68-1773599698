@@ -17,12 +17,14 @@ import {
   Activity,
   Wrench,
   Network,
-  Shield
+  Shield,
+  Download
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getDebugLogs, clearDebugLogs, copyLogsToClipboard } from "@/lib/diagnostics";
 import type { DebugLogEntry } from "@/lib/diagnostics";
 import type { User } from "@/types";
+import { Button } from "@/components/ui/button";
 
 export default function Settings() {
   const { currentUser, settings, updateSettings, tracks, addTrack, saveTracks, appName, siteName, updateBranding, setCurrentUser } = useApp();
@@ -354,6 +356,21 @@ export default function Settings() {
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-zinc-400" />
+            </button>
+
+            {/* Downloads & Exports */}
+            <button
+              onClick={() => router.push("/downloads")}
+              className="flex items-center gap-4 p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all border border-zinc-700 text-left group"
+            >
+              <div className="w-12 h-12 rounded-lg bg-indigo-600/10 group-hover:bg-indigo-600/20 flex items-center justify-center transition-colors">
+                <Download className="w-6 h-6 text-indigo-400" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold group-hover:text-white transition-colors">Downloads & Exports</div>
+                <span className="text-xs text-zinc-400 mt-1">Export inspection data, reports, and backups</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
             </button>
           </div>
         </div>
